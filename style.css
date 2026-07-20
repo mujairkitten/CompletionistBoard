@@ -405,7 +405,8 @@ section.block {
 .trophy-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  flex-wrap: wrap;
   font-size: 12.5px;
   font-weight: 500;
 }
@@ -439,6 +440,7 @@ section.block {
 .add-trophy {
   display: flex;
   gap: 6px;
+  position: relative;
 }
 
 .add-trophy input {
@@ -451,6 +453,85 @@ section.block {
   border-radius: 999px;
   background: var(--bg);
   color: var(--ink);
+}
+
+/* Race picker dropdown */
+.race-suggest {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 50;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .5), 0 0 16px rgba(139, 123, 255, .12);
+}
+
+.race-suggest.show {
+  display: block;
+}
+
+.race-suggest-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.race-suggest-item:last-child {
+  border-bottom: none;
+}
+
+.race-suggest-item:hover {
+  background: var(--panel);
+}
+
+.race-suggest-empty {
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-faint);
+}
+
+.race-name {
+  flex: 1;
+  color: var(--ink);
+}
+
+.race-meta {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.race-grade-tag {
+  font-family: "Quicksand", sans-serif;
+  font-weight: 700;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--accent2);
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.mini-tag {
+  font-family: "Quicksand", sans-serif;
+  font-weight: 700;
+  font-size: 9.5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #12141a;
+  white-space: nowrap;
 }
 
 #tooltip {

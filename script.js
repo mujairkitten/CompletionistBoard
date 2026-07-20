@@ -93,6 +93,166 @@ const DATABASE = [
   { name: "Copano Rickey", apt: { turf: "F", dirt: "A", short: "C", mile: "A", medium: "A", long: "G" } },
 ];
 
+// Official race calendar (G1/G2/G3), sourced from the user's Races.xlsx.
+// Used to power the searchable trophy picker on each My List card.
+const RACES = [
+  {grade:'G1',year:'Senior',month:'February',turn:'Late',name:'February Stakes',track:'Dirt',distance:'Mile'},
+  {grade:'G1',year:'Senior',month:'March',turn:'Late',name:'Takamatsunomiya Kinen',track:'Turf',distance:'Sprint'},
+  {grade:'G1',year:'Senior',month:'March',turn:'Late',name:'Osaka Hai',track:'Turf',distance:'Medium'},
+  {grade:'G1',year:'Classic',month:'April',turn:'Early',name:'Oka Sho',track:'Turf',distance:'Mile'},
+  {grade:'G1',year:'Classic',month:'April',turn:'Early',name:'Satsuki Sho',track:'Turf',distance:'Medium'},
+  {grade:'G1',year:'Senior',month:'April',turn:'Late',name:'Tenno Sho (Spring)',track:'Turf',distance:'Long'},
+  {grade:'G1',year:'Classic',month:'May',turn:'Early',name:'NHK Mile Cup',track:'Turf',distance:'Mile'},
+  {grade:'G1',year:'Senior',month:'May',turn:'Early',name:'Victoria Mile',track:'Turf',distance:'Mile'},
+  {grade:'G1',year:'Classic',month:'May',turn:'Late',name:'Japanese Oaks',track:'Turf',distance:'Medium'},
+  {grade:'G1',year:'Classic',month:'May',turn:'Late',name:'Japanese Derby',track:'Turf',distance:'Medium'},
+  {grade:'G1',year:'Classic, Senior',month:'June',turn:'Early',name:'Yasuda Kinen',track:'Turf',distance:'Mile'},
+  {grade:'G1',year:'Classic, Senior',month:'June',turn:'Late',name:'Takarazuka Kinen',track:'Turf',distance:'Mile'},
+  {grade:'G1',year:'Classic, Senior',month:'September',turn:'Late',name:'Sprinters Stakes',track:'Turf',distance:'Sprint'},
+  {grade:'G1',year:'Classic',month:'October',turn:'Late',name:'Shuka Sho',track:'Turf',distance:'Medium'},
+  {grade:'G1',year:'Classic',month:'October',turn:'Late',name:'Kikuka Sho',track:'Turf',distance:'Long'},
+  {grade:'G1',year:'Classic, Senior',month:'October',turn:'Late',name:'Tenno Sho (Autumn)',track:'Turf',distance:'Medium'},
+  {grade:'G1',year:'Classic, Senior',month:'November',turn:'Early',name:'Queen Elizabeth II Cup',track:'Turf',distance:'Medium'},
+  {grade:'G1',year:'Classic, Senior',month:'November',turn:'Late',name:'Mile Championship',track:'Turf',distance:'Mile'},
+  {grade:'G1',year:'Classic, Senior',month:'November',turn:'Late',name:'Japan Cup',track:'Turf',distance:'Medium'},
+  {grade:'G1',year:'Classic, Senior',month:'December',turn:'Early',name:'Champions Cup',track:'Dirt',distance:'Mile'},
+  {grade:'G1',year:'Junior',month:'December',turn:'Early',name:'Hanshin Juvenile Fillies',track:'Turf',distance:'Mile'},
+  {grade:'G1',year:'Junior',month:'December',turn:'Early',name:'Asahi Hai Futurity Stakes',track:'Turf',distance:'Mile'},
+  {grade:'G1',year:'Classic, Senior',month:'December',turn:'Late',name:'Arima Kinen',track:'Turf',distance:'Long'},
+  {grade:'G1',year:'Junior',month:'December',turn:'Late',name:'Hopeful Stakes',track:'Turf',distance:'Medium'},
+  {grade:'G1',year:'Classic, Senior',month:'December',turn:'Late',name:'Tokyo Daitoshen',track:'Dirt',distance:'Medium'},
+  {grade:'G1',year:'Classic, Senior',month:'November',turn:'Early',name:'JBC Classic',track:'Dirt',distance:'Medium'},
+  {grade:'G1',year:'Classic, Senior',month:'November',turn:'Early',name:'JBC Sprint',track:'Dirt',distance:'Sprint'},
+  {grade:'G1',year:'Classic, Senior',month:'November',turn:'Early',name:'JBC Ladies Classic',track:'Dirt',distance:'Mile'},
+  {grade:'G1',year:'Classic',month:'July',turn:'Early',name:'Japan Dirt Derby',track:'Dirt',distance:'Medium'},
+  {grade:'G1',year:'Senior',month:'June',turn:'Late',name:'Teio Sho',track:'Dirt',distance:'Medium'},
+  {grade:'G1',year:'Senior',month:'February',turn:'Early',name:'Kawasaki Kinen',track:'Dirt',distance:'Medium'},
+  {grade:'G1',year:'Junior',month:'December',turn:'Late',name:'Zen-Nippon Junior Yushun',track:'Dirt',distance:'Mile'},
+  {grade:'G1',year:'Senior',month:'May',turn:'Early',name:'Kashiwa Kinen',track:'Dirt',distance:'Mile'},
+  {grade:'G1',year:'Classic, Senior',month:'October',turn:'Early',name:'Mile Championship Nambu Hai',track:'Dirt',distance:'Mile'},
+  {grade:'G2',year:'Senior',month:'January',turn:'Early',name:'Nikkei Shinshun Hai',track:'Turf',distance:'Medium'},
+  {grade:'G2',year:'Senior',month:'January',turn:'Late',name:'Tokai Stakes',track:'Dirt',distance:'Mile'},
+  {grade:'G2',year:'Senior',month:'January',turn:'Late',name:'American JCC',track:'Turf',distance:'Medium'},
+  {grade:'G2',year:'Senior',month:'February',turn:'Early',name:'Kyoto Kinen',track:'Turf',distance:'Medium'},
+  {grade:'G2',year:'Senior',month:'February',turn:'Late',name:'Nakayama Kinen',track:'Turf',distance:'Mile'},
+  {grade:'G2',year:'Classic',month:'March',turn:'Early',name:'Tulip Sho',track:'Turf',distance:'Mile'},
+  {grade:'G2',year:'Classic',month:'March',turn:'Early',name:'Yayoi Sho',track:'Turf',distance:'Medium'},
+  {grade:'G2',year:'Senior',month:'March',turn:'Early',name:'Kinko Sho',track:'Turf',distance:'Medium'},
+  {grade:'G2',year:'Classic',month:'March',turn:'Early',name:'Fillies\' Revue',track:'Turf',distance:'Sprint'},
+  {grade:'G2',year:'Senior',month:'March',turn:'Late',name:'Hanshin Daishoten',track:'Turf',distance:'Long'},
+  {grade:'G2',year:'Classic',month:'March',turn:'Late',name:'Spring Stakes',track:'Turf',distance:'Mile'},
+  {grade:'G2',year:'Senior',month:'March',turn:'Late',name:'Nikkei Sho',track:'Turf',distance:'Long'},
+  {grade:'G2',year:'Senior',month:'April',turn:'Early',name:'Hanshin Umamusume Stakes',track:'Turf',distance:'Mile'},
+  {grade:'G2',year:'Classic',month:'April',turn:'Early',name:'New Zealand Trophy',track:'Turf',distance:'Mile'},
+  {grade:'G2',year:'Senior',month:'April',turn:'Late',name:'Milers Cup',track:'Turf',distance:'Mile'},
+  {grade:'G2',year:'Classic',month:'April',turn:'Late',name:'Flora Stakes',track:'Turf',distance:'Medium'},
+  {grade:'G2',year:'Classic',month:'April',turn:'Late',name:'Aoba Sho',track:'Turf',distance:'Medium'},
+  {grade:'G2',year:'Classic',month:'May',turn:'Early',name:'Kyoto Shimbun Hai',track:'Turf',distance:'Medium'},
+  {grade:'G2',year:'Senior',month:'May',turn:'Early',name:'Keio Hai Spring Cup',track:'Turf',distance:'Sprint'},
+  {grade:'G2',year:'Senior',month:'May',turn:'Late',name:'Meguro Kinen',track:'Turf',distance:'Long'},
+  {grade:'G2',year:'Classic, Senior',month:'August',turn:'Late',name:'Sapporo Kinen',track:'Turf',distance:'Medium'},
+  {grade:'G2',year:'Classic, Senior',month:'September',turn:'Early',name:'Centaur Stakes',track:'Turf',distance:'Sprint'},
+  {grade:'G2',year:'Classic',month:'September',turn:'Early',name:'Rose Stakes',track:'Turf',distance:'Mile'},
+  {grade:'G2',year:'Classic',month:'September',turn:'Late',name:'St. Lite Kinen',track:'Turf',distance:'Medium'},
+  {grade:'G2',year:'Classic',month:'September',turn:'Late',name:'Kobe Shimbun Hai',track:'Turf',distance:'Medium'},
+  {grade:'G2',year:'Classic, Senior',month:'September',turn:'Late',name:'All Comers',track:'Turf',distance:'Medium'},
+  {grade:'G2',year:'Classic, Senior',month:'October',turn:'Early',name:'Mainichi Okan',track:'Turf',distance:'Mile'},
+  {grade:'G2',year:'Classic, Senior',month:'October',turn:'Early',name:'Kyoto Daishoten',track:'Turf',distance:'Medium'},
+  {grade:'G2',year:'Classic, Senior',month:'October',turn:'Early',name:'Fuchu Umamusume Stakes',track:'Turf',distance:'Mile'},
+  {grade:'G2',year:'Classic, Senior',month:'October',turn:'Late',name:'Fuji Stakes',track:'Turf',distance:'Mile'},
+  {grade:'G2',year:'Classic, Senior',month:'October',turn:'Late',name:'Swan Stakes',track:'Turf',distance:'Sprint'},
+  {grade:'G2',year:'Junior',month:'November',turn:'Early',name:'Keio Hai Junior Stakes',track:'Turf',distance:'Sprint'},
+  {grade:'G2',year:'Classic, Senior',month:'November',turn:'Early',name:'Republica Argentina',track:'Turf',distance:'Long'},
+  {grade:'G2',year:'Junior',month:'November',turn:'Early',name:'Daily Hai Junior Stakes',track:'Turf',distance:'Mile'},
+  {grade:'G2',year:'Classic, Senior',month:'December',turn:'Early',name:'Stayers Stakes',track:'Turf',distance:'Long'},
+  {grade:'G2',year:'Classic, Senior',month:'December',turn:'Late',name:'Hanshin Cup',track:'Turf',distance:'Sprint'},
+  {grade:'G2',year:'Classic, Senior',month:'October',turn:'Early',name:'Ladies\' Prelude',track:'Dirt',distance:'Mile'},
+  {grade:'G2',year:'Classic, Senior',month:'October',turn:'Early',name:'Tokyo Hai',track:'Dirt',distance:'Sprint'},
+  {grade:'G2',year:'Senior',month:'March',turn:'Early',name:'Empress Hai',track:'Dirt',distance:'Medium'},
+  {grade:'G2',year:'Classic',month:'June',turn:'Early',name:'Kanto Oaks',track:'Dirt',distance:'Medium'},
+  {grade:'G2',year:'Senior',month:'March',turn:'Late',name:'Diolite Kinen',track:'Dirt',distance:'Medium'},
+  {grade:'G2',year:'Classic, Senior',month:'September',turn:'Late',name:'Sazanka TV Hai',track:'Dirt',distance:'Mile'},
+  {grade:'G3',year:'Senior',month:'January',turn:'Early',name:'Kyoto Kimpai',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Senior',month:'January',turn:'Early',name:'Nakayama Kimpai',track:'Turf',distance:'Medium'},
+  {grade:'G3',year:'Classic',month:'January',turn:'Early',name:'Shinzan Kinen',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Classic',month:'January',turn:'Early',name:'Fairy Stakes',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Senior',month:'January',turn:'Early',name:'Aichi Hai',track:'Turf',distance:'Medium'},
+  {grade:'G3',year:'Classic',month:'January',turn:'Early',name:'Keisei Hai',track:'Turf',distance:'Medium'},
+  {grade:'G3',year:'Senior',month:'January',turn:'Late',name:'Silk Road Stakes',track:'Turf',distance:'Sprint'},
+  {grade:'G3',year:'Senior',month:'January',turn:'Late',name:'Negishi Stakes',track:'Dirt',distance:'Sprint'},
+  {grade:'G3',year:'Classic',month:'February',turn:'Early',name:'Kisaragi Sho',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Senior',month:'February',turn:'Early',name:'Tokyo Shimbun Hai',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Classic',month:'February',turn:'Early',name:'Queen Cup',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Classic',month:'February',turn:'Early',name:'Kyodo News Hai',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Senior',month:'February',turn:'Late',name:'Kyoto Umamusume Stakes',track:'Turf',distance:'Sprint'},
+  {grade:'G3',year:'Senior',month:'February',turn:'Late',name:'Diamond Stakes',track:'Turf',distance:'Long'},
+  {grade:'G3',year:'Senior',month:'February',turn:'Late',name:'Kokura Daishoten',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Classic',month:'April',turn:'Early',name:'Arlington Cup',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Senior',month:'February',turn:'Late',name:'Hankyu Hai',track:'Turf',distance:'Sprint'},
+  {grade:'G3',year:'Senior',month:'March',turn:'Early',name:'Ocean Stakes',track:'Turf',distance:'Sprint'},
+  {grade:'G3',year:'Senior',month:'March',turn:'Early',name:'Nakayama Umamusume Stakes',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Classic',month:'March',turn:'Late',name:'Falcon Stakes',track:'Turf',distance:'Sprint'},
+  {grade:'G3',year:'Classic',month:'March',turn:'Late',name:'Flower Cup',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Classic',month:'March',turn:'Late',name:'Mainichi Hai',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Senior',month:'March',turn:'Late',name:'March Stakes',track:'Dirt',distance:'Mile'},
+  {grade:'G3',year:'Senior',month:'April',turn:'Early',name:'Lord Derby Challenge Trophy',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Senior',month:'April',turn:'Early',name:'Antares Stakes',track:'Dirt',distance:'Mile'},
+  {grade:'G3',year:'Senior',month:'April',turn:'Late',name:'Fukushima Umamusume Stakes',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Senior',month:'May',turn:'Early',name:'Niigata Daishoten',track:'Turf',distance:'Medium'},
+  {grade:'G3',year:'Senior',month:'May',turn:'Late',name:'Heian Stakes',track:'Dirt',distance:'Medium'},
+  {grade:'G3',year:'Classic',month:'May',turn:'Late',name:'Aoi Stakes',track:'Turf',distance:'Sprint'},
+  {grade:'G3',year:'Classic, Senior',month:'June',turn:'Early',name:'Naruo Kinen',track:'Turf',distance:'Medium'},
+  {grade:'G3',year:'Classic, Senior',month:'June',turn:'Early',name:'Mermaid Stakes',track:'Turf',distance:'Medium'},
+  {grade:'G3',year:'Classic, Senior',month:'June',turn:'Early',name:'Epsom Cup',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Classic',month:'June',turn:'Late',name:'Unicorn Stakes',track:'Dirt',distance:'Mile'},
+  {grade:'G3',year:'Classic, Senior',month:'June',turn:'Late',name:'Hakodate Sprint Stakes',track:'Turf',distance:'Sprint'},
+  {grade:'G3',year:'Classic, Senior',month:'July',turn:'Early',name:'CBC Sho',track:'Turf',distance:'Sprint'},
+  {grade:'G3',year:'Classic',month:'July',turn:'Early',name:'Radio Nikkei Sho',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Classic, Senior',month:'July',turn:'Early',name:'Procyon Stakes',track:'Dirt',distance:'Sprint'},
+  {grade:'G3',year:'Classic, Senior',month:'July',turn:'Early',name:'Tanabata Sho',track:'Turf',distance:'Medium'},
+  {grade:'G3',year:'Classic, Senior',month:'July',turn:'Early',name:'Hakodate Kinen',track:'Turf',distance:'Medium'},
+  {grade:'G3',year:'Classic, Senior',month:'July',turn:'Late',name:'Chukyo Kinen',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Junior',month:'July',turn:'Late',name:'Hakodate Junior Stakes',track:'Turf',distance:'Sprint'},
+  {grade:'G3',year:'Classic, Senior',month:'July',turn:'Late',name:'Ibis Summer Dash',track:'Turf',distance:'Sprint'},
+  {grade:'G3',year:'Classic, Senior',month:'July',turn:'Late',name:'Queen Stakes',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Classic, Senior',month:'August',turn:'Early',name:'Kokura Kinen',track:'Turf',distance:'Medium'},
+  {grade:'G3',year:'Classic',month:'August',turn:'Early',name:'Leopard Stakes',track:'Dirt',distance:'Mile'},
+  {grade:'G3',year:'Classic, Senior',month:'August',turn:'Early',name:'Sekiya Kinen',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Classic, Senior',month:'August',turn:'Early',name:'Elm Stakes',track:'Dirt',distance:'Mile'},
+  {grade:'G3',year:'Classic, Senior',month:'August',turn:'Late',name:'Kitakyushu Kinen',track:'Turf',distance:'Sprint'},
+  {grade:'G3',year:'Junior',month:'August',turn:'Late',name:'Niigata Junior Stakes',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Classic, Senior',month:'August',turn:'Late',name:'Keeneland Cup',track:'Turf',distance:'Sprint'},
+  {grade:'G3',year:'Junior',month:'September',turn:'Early',name:'Sapporo Junior Stakes',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Junior',month:'September',turn:'Early',name:'Kokura Junior Stakes',track:'Turf',distance:'Sprint'},
+  {grade:'G3',year:'Classic, Senior',month:'September',turn:'Early',name:'Niigata Kinen',track:'Turf',distance:'Medium'},
+  {grade:'G3',year:'Classic',month:'September',turn:'Early',name:'Shion Stakes',track:'Turf',distance:'Medium'},
+  {grade:'G3',year:'Classic, Senior',month:'September',turn:'Early',name:'Keisei Hai Autumn Handicap',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Classic, Senior',month:'September',turn:'Late',name:'Sirius Stakes',track:'Dirt',distance:'Medium'},
+  {grade:'G3',year:'Junior',month:'October',turn:'Early',name:'Saudi Arabia Royal Cup',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Junior',month:'October',turn:'Late',name:'Artemis Stakes',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Junior',month:'November',turn:'Early',name:'Fantasy Stakes',track:'Turf',distance:'Sprint'},
+  {grade:'G3',year:'Classic, Senior',month:'November',turn:'Early',name:'Miyako Stakes',track:'Dirt',distance:'Mile'},
+  {grade:'G3',year:'Classic, Senior',month:'November',turn:'Early',name:'Musashino Stakes',track:'Dirt',distance:'Mile'},
+  {grade:'G3',year:'Classic, Senior',month:'November',turn:'Early',name:'Fukushima Kinen',track:'Turf',distance:'Medium'},
+  {grade:'G3',year:'Junior',month:'November',turn:'Late',name:'Tokyo Sports Hai Junior Stakes',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Junior',month:'November',turn:'Late',name:'Kyoto Junior Stakes',track:'Turf',distance:'Medium'},
+  {grade:'G3',year:'Classic',month:'November',turn:'Late',name:'Keihan Hai',track:'Turf',distance:'Sprint'},
+  {grade:'G3',year:'Classic, Senior',month:'December',turn:'Early',name:'Challenge Cup',track:'Turf',distance:'Medium'},
+  {grade:'G3',year:'Classic, Senior',month:'December',turn:'Early',name:'Chunichi Shimbun Hai',track:'Turf',distance:'Medium'},
+  {grade:'G3',year:'Classic, Senior',month:'December',turn:'Early',name:'Capella Stakes',track:'Dirt',distance:'Sprint'},
+  {grade:'G3',year:'Classic, Senior',month:'December',turn:'Early',name:'Turquoise Stakes',track:'Turf',distance:'Mile'},
+  {grade:'G3',year:'Senior',month:'January',turn:'Late',name:'TCK Jo-o Hai',track:'Dirt',distance:'Mile'},
+  {grade:'G3',year:'Classic, Senior',month:'April',turn:'Late',name:'Tokyo Sprint',track:'Dirt',distance:'Sprint'},
+  {grade:'G3',year:'Classic, Senior',month:'July',turn:'Early',name:'Sparking Lady Cup',track:'Dirt',distance:'Medium'},
+  {grade:'G3',year:'Classic, Senior',month:'April',turn:'Early',name:'Marine Cup',track:'Dirt',distance:'Mile'},
+  {grade:'G3',year:'Classic, Senior',month:'December',turn:'Early',name:'Queen Sho',track:'Dirt',distance:'Mile'},
+  {grade:'G3',year:'Classic, Senior',month:'July',turn:'Late',name:'Mercury Cup',track:'Dirt',distance:'Medium'},
+  {grade:'G3',year:'Classic, Senior',month:'August',turn:'Late',name:'Cluster Cup',track:'Dirt',distance:'Sprint'},
+];
+// Maps a race's Track/Distance text (as given in the spreadsheet) to the aptitude keys used above.
+const TRACK_TO_APT_KEY = { Turf: "turf", Dirt: "dirt" };
+const DIST_TO_APT_KEY = { Sprint: "short", Mile: "mile", Medium: "medium", Long: "long" };
+
 let state = { myList: [] };
 function uid() { return Math.random().toString(36).slice(2, 9); }
 
@@ -243,10 +403,38 @@ function renderMyList() {
   state.myList.forEach(t => {
     const delBtn = document.getElementById(`del-${t.id}`);
     if (delBtn) delBtn.addEventListener('click', () => removeFromMyList(t.id));
+
     const addTBtn = document.getElementById(`addt-btn-${t.id}`);
     const addTInput = document.getElementById(`addt-input-${t.id}`);
-    if (addTBtn) addTBtn.addEventListener('click', () => addTrophy(t.id, addTInput.value));
-    if (addTInput) addTInput.addEventListener('keydown', e => { if (e.key === 'Enter') addTrophy(t.id, addTInput.value); });
+    const suggestBox = document.getElementById(`addt-suggest-${t.id}`);
+
+    if (addTBtn) addTBtn.addEventListener('click', () => {
+      addTrophyFromInput(t.id, addTInput.value);
+      addTInput.value = "";
+      hideSuggestBox(suggestBox);
+    });
+    if (addTInput) {
+      addTInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          addTrophyFromInput(t.id, addTInput.value);
+          addTInput.value = "";
+          hideSuggestBox(suggestBox);
+        } else if (e.key === 'Escape') {
+          hideSuggestBox(suggestBox);
+        }
+      });
+      addTInput.addEventListener('input', () => {
+        renderRaceSuggestions(t, addTInput.value, suggestBox, addTInput);
+      });
+      addTInput.addEventListener('focus', () => {
+        renderRaceSuggestions(t, addTInput.value, suggestBox, addTInput);
+      });
+      addTInput.addEventListener('blur', () => {
+        // Delay so a click on a suggestion registers before the box hides.
+        setTimeout(() => hideSuggestBox(suggestBox), 150);
+      });
+    }
+
     t.trophies.forEach(tr => {
       const cb = document.getElementById(`cb-${t.id}-${tr.id}`);
       if (cb) cb.addEventListener('change', () => toggleTrophy(t.id, tr.id));
@@ -254,6 +442,70 @@ function renderMyList() {
       if (rm) rm.addEventListener('click', () => removeTrophy(t.id, tr.id));
     });
   });
+}
+
+function findRaceByExactName(name) {
+  const q = (name || "").trim().toLowerCase();
+  return RACES.find(r => r.name.toLowerCase() === q);
+}
+
+function raceMeta(race) {
+  return { grade: race.grade, track: race.track, distance: race.distance };
+}
+
+function hideSuggestBox(box) {
+  if (box) box.classList.remove('show');
+}
+
+function renderRaceSuggestions(trainee, query, box, inputEl) {
+  if (!box) return;
+  const q = (query || "").trim().toLowerCase();
+  const alreadyAdded = new Set(trainee.trophies.map(tr => tr.name.toLowerCase()));
+
+  let matches = RACES.filter(r => !alreadyAdded.has(r.name.toLowerCase()));
+  if (q) matches = matches.filter(r => r.name.toLowerCase().includes(q));
+
+  if (matches.length === 0) {
+    box.innerHTML = `<div class="race-suggest-empty">${q ? "No matching race — Enter adds it as a custom trophy." : "Type to search the race calendar."}</div>`;
+  } else {
+    box.innerHTML = matches.map(r => {
+      const trackKey = TRACK_TO_APT_KEY[r.track];
+      const distKey = DIST_TO_APT_KEY[r.distance];
+      const trackGrade = gradeOf(trainee.aptitudes[trackKey]);
+      const distGrade = gradeOf(trainee.aptitudes[distKey]);
+      const trackTier = GRADE_INFO[trackGrade].tier;
+      const distTier = GRADE_INFO[distGrade].tier;
+      return `
+      <div class="race-suggest-item" data-race="${escapeHtml(r.name)}">
+        <span class="race-grade-tag">${r.grade}</span>
+        <span class="race-name">${escapeHtml(r.name)}</span>
+        <span class="race-meta">
+          <span class="mini-tag" style="background:var(--${trackTier})">${r.track}</span>
+          <span class="mini-tag" style="background:var(--${distTier})">${r.distance}</span>
+        </span>
+      </div>`;
+    }).join("");
+  }
+  box.classList.add('show');
+
+  box.querySelectorAll('.race-suggest-item').forEach(item => {
+    item.addEventListener('mousedown', (e) => {
+      e.preventDefault(); // keep focus so blur doesn't fire before click
+      const race = findRaceByExactName(item.dataset.race);
+      if (race) {
+        addTrophy(trainee.id, race.name, raceMeta(race));
+        inputEl.value = "";
+        hideSuggestBox(box);
+      }
+    });
+  });
+}
+
+function addTrophyFromInput(tid, rawName) {
+  const name = (rawName || "").trim();
+  if (!name) return;
+  const race = findRaceByExactName(name);
+  addTrophy(tid, name, race ? raceMeta(race) : null);
 }
 
 function myCardHtml(t) {
@@ -267,12 +519,27 @@ function myCardHtml(t) {
   const pct = total ? Math.round((done / total) * 100) : 0;
 
   const trophyHtml = total
-    ? t.trophies.map(tr => `
+    ? t.trophies.map(tr => {
+      let metaHtml = "";
+      if (tr.track && tr.distance) {
+        const trackKey = TRACK_TO_APT_KEY[tr.track];
+        const distKey = DIST_TO_APT_KEY[tr.distance];
+        const trackGrade = gradeOf(t.aptitudes[trackKey]);
+        const distGrade = gradeOf(t.aptitudes[distKey]);
+        metaHtml = `
+          <span class="mini-tag" style="background:var(--panel-2);color:var(--ink-dim)">${tr.grade || ""}</span>
+          <span class="mini-tag" style="background:var(--${GRADE_INFO[trackGrade].tier})" title="${tr.track} aptitude: ${trackGrade}">${tr.track}</span>
+          <span class="mini-tag" style="background:var(--${GRADE_INFO[distGrade].tier})" title="${tr.distance} aptitude: ${distGrade}">${tr.distance}</span>
+        `;
+      }
+      return `
       <div class="trophy-item ${tr.checked ? 'checked' : ''}">
         <input type="checkbox" id="cb-${t.id}-${tr.id}" ${tr.checked ? 'checked' : ''}>
         <span>${escapeHtml(tr.name)}</span>
+        ${metaHtml}
         <button class="rm" id="rm-${t.id}-${tr.id}">&times;</button>
-      </div>`).join("")
+      </div>`;
+    }).join("")
     : `<div style="font-size:12px;color:var(--ink-faint);font-style:italic;">No races logged yet.</div>`;
 
   return `
@@ -291,8 +558,9 @@ function myCardHtml(t) {
       </div>
       <div class="trophy-list">${trophyHtml}</div>
       <div class="add-trophy">
-        <input type="text" id="addt-input-${t.id}" placeholder="Add a race / trophy">
+        <input type="text" id="addt-input-${t.id}" placeholder="Search races (G1–G3) or type a custom trophy" autocomplete="off">
         <button class="btn small" id="addt-btn-${t.id}">+ Add</button>
+        <div class="race-suggest" id="addt-suggest-${t.id}"></div>
       </div>
     </div>
   </div>`;
@@ -302,12 +570,14 @@ function removeFromMyList(id) {
   state.myList = state.myList.filter(t => t.id !== id);
   saveState(); renderMyList();
 }
-function addTrophy(tid, name) {
+function addTrophy(tid, name, meta) {
   name = (name || "").trim();
   if (!name) return;
   const t = state.myList.find(x => x.id === tid);
   if (!t) return;
-  t.trophies.push({ id: uid(), name, checked: false });
+  const trophy = { id: uid(), name, checked: false };
+  if (meta) { trophy.grade = meta.grade; trophy.track = meta.track; trophy.distance = meta.distance; }
+  t.trophies.push(trophy);
   saveState(); renderMyList();
 }
 function toggleTrophy(tid, trid) {
