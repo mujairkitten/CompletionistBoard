@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Completionist Board - Track character aptitudes, distances, and trophy ledger for trainees.">
+  <title>Completionist Board</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap topbar-inner">
+    <div class="brand">
+      <h1>Completionist Board</h1>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn" id="export-btn">Export list</button>
+      <label class="btn" for="import-file">Import list</label>
+      <input type="file" id="import-file" accept=".json">
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <section class="block">
+    <div class="block-head">
+      <span class="gate-badge" id="db-gate">0</span>
+      <h2>Trainee Database</h2>
+      <span class="count" id="db-count"></span>
+      <span class="desc">One entry per character. Hover any chip for what it means.</span>
+    </div>
+    <div class="search-row">
+      <input class="search" id="db-search" type="text" placeholder="Search the database…">
+    </div>
+    <div class="db-grid" id="db-grid"></div>
+  </section>
+
+  <hr style="border:none;border-top:1px solid var(--line-soft);margin:34px 0;">
+
+  <section class="block">
+    <div class="block-head">
+      <span class="gate-badge" id="my-gate">0</span>
+      <h2>My List</h2>
+      <span class="desc">Track aptitudes and trophies toward Completionist.</span>
+    </div>
+    <div class="search-row">
+      <input type="text" class="search" id="custom-name" placeholder="Add a custom trainee by name…" style="max-width:260px;">
+      <button class="btn" id="custom-add-btn">+ Add custom</button>
+    </div>
+    <div class="mylist" id="mylist"></div>
+    <div class="empty-note" id="mylist-empty" style="display:none;">Your list is empty — add trainees from the database above, or add a custom one.</div>
+  </section>
+
+  <footer>
+    Character aptitudes consolidated from the Umamusume Wiki trainee tables across all Global costumes. Latest Update: July 20, 2026 (Copano Rickey).<br>
+    Where a costume shifts an aptitude (e.g. Haru Urara's Mile), the chip shows both grades — hover it for which costume does what.<br>
+    Your list is stored privately in this browser session. Use Export/Import to move it between sessions or devices.<br><br>
+    2026, Mujairkitten. Made with Claude Sonnet 5. Not affiliated with Cygames.
+  </footer>
+</div>
+
+<div id="tooltip"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
