@@ -253,7 +253,7 @@ const RACES = [
 const TRACK_TO_APT_KEY = { Turf: "turf", Dirt: "dirt" };
 const DIST_TO_APT_KEY = { Sprint: "short", Mile: "mile", Medium: "medium", Long: "long" };
 
-let state = { myList: [] };
+let state = { myList: [], settings: { allowCustomTrainees: true, allowCustomTrophies: true } };
 function uid() { return Math.random().toString(36).slice(2, 9); }
 
 async function loadState() {
@@ -266,6 +266,9 @@ async function loadState() {
       if (val) { state = JSON.parse(val); }
     }
   } catch (e) { console.error("Storage load failed", e); }
+  if (!state.settings) {
+    state.settings = { allowCustomTrainees: true, allowCustomTrophies: true };
+  }
 }
 
 async function saveState() {
@@ -302,10 +305,16 @@ function showTooltip(target, catKey, aptValue) {
     html += `<div class="tt-variant">${escapeHtml(alt.note)}</div>`;
   }
   tooltipEl.innerHTML = html;
+
   const rect = target.getBoundingClientRect();
   tooltipEl.style.left = Math.min(rect.left, window.innerWidth - 236) + "px";
-  let top = rect.top - (alt ? 118 : 96);
-  if (top < 8) top = rect.bottom + 8;
+
+  // Measure the box as actually rendered (varies with how many lines the tip wraps to)
+  // rather than assuming a fixed height, so it always sits flush above the chip.
+  const gap = 8;
+  const tooltipHeight = tooltipEl.getBoundingClientRect().height;
+  let top = rect.top - tooltipHeight - gap;
+  if (top < gap) top = rect.bottom + gap;
   tooltipEl.style.top = top + "px";
   tooltipEl.classList.add('show');
 }
@@ -343,6 +352,22 @@ function wireChips(root) {
   });
 }
 
+function slugify(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+function iconHtml(name, size) {
+  const slug = slugify(name);
+  const initial = (name.trim()[0] || '?').toUpperCase();
+  return `<div class="trainee-icon" style="--icon-size:${size}px">
+    <img src="icons/${slug}.png" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+    <span class="icon-fallback">${initial}</span>
+  </div>`;
+}
+function raceDateLabel(r) {
+  const yearLabel = r.year.replace(/,\s*/g, '/');
+  return `${yearLabel} ${r.turn} ${r.month}`;
+}
+
 function renderDatabase() {
   const grid = document.getElementById('db-grid');
   const filter = document.getElementById('db-search').value.trim().toLowerCase();
@@ -350,21 +375,25 @@ function renderDatabase() {
   document.getElementById('db-count').textContent = `${list.length} / ${DATABASE.length}`;
   document.getElementById('db-gate').textContent = DATABASE.length;
 
+  const addedNames = new Set(state.myList.map(t => t.name.toLowerCase()));
+
   grid.innerHTML = list.map((d) => {
     const realIndex = DATABASE.indexOf(d);
+    const already = addedNames.has(d.name.toLowerCase());
     return `
     <div class="db-card">
+      <span class="db-num">${String(realIndex + 1).padStart(2, '0')}</span>
       <div class="db-card-top">
-        <span class="db-num">${String(realIndex + 1).padStart(2, '0')}</span>
+        ${iconHtml(d.name, 40)}
         <div class="db-name">${escapeHtml(d.name)}</div>
       </div>
       ${aptGroupsHtml(d.apt)}
-      <button class="btn small add-btn" data-add="${realIndex}">+ Add to my list</button>
+      <button class="btn small add-btn" data-add="${realIndex}" ${already ? 'disabled' : ''}>${already ? '✓ In my list' : '+ Add to my list'}</button>
     </div>`;
   }).join("");
 
   wireChips(grid);
-  grid.querySelectorAll('[data-add]').forEach(btn => {
+  grid.querySelectorAll('[data-add]:not([disabled])').forEach(btn => {
     btn.addEventListener('click', () => {
       const d = DATABASE[parseInt(btn.dataset.add, 10)];
       addToMyList(d.name, JSON.parse(JSON.stringify(d.apt)));
@@ -383,6 +412,7 @@ function addToMyList(name, apt) {
   state.myList.push({ id: uid(), name, aptitudes: apt, trophies: [] });
   saveState();
   renderMyList();
+  renderDatabase();
 }
 
 function renderMyList() {
@@ -450,7 +480,7 @@ function findRaceByExactName(name) {
 }
 
 function raceMeta(race) {
-  return { grade: race.grade, track: race.track, distance: race.distance };
+  return { grade: race.grade, track: race.track, distance: race.distance, year: race.year, turn: race.turn, month: race.month };
 }
 
 function hideSuggestBox(box) {
@@ -478,7 +508,10 @@ function renderRaceSuggestions(trainee, query, box, inputEl) {
       return `
       <div class="race-suggest-item" data-race="${escapeHtml(r.name)}">
         <span class="race-grade-tag">${r.grade}</span>
-        <span class="race-name">${escapeHtml(r.name)}</span>
+        <span class="race-info">
+          <span class="race-name">${escapeHtml(r.name)}</span>
+          <span class="race-date">${escapeHtml(raceDateLabel(r))}</span>
+        </span>
         <span class="race-meta">
           <span class="mini-tag" style="background:var(--${trackTier})">${r.track}</span>
           <span class="mini-tag" style="background:var(--${distTier})">${r.distance}</span>
@@ -505,6 +538,7 @@ function addTrophyFromInput(tid, rawName) {
   const name = (rawName || "").trim();
   if (!name) return;
   const race = findRaceByExactName(name);
+  if (!race && !state.settings.allowCustomTrophies) return;
   addTrophy(tid, name, race ? raceMeta(race) : null);
 }
 
@@ -526,7 +560,9 @@ function myCardHtml(t) {
         const distKey = DIST_TO_APT_KEY[tr.distance];
         const trackGrade = gradeOf(t.aptitudes[trackKey]);
         const distGrade = gradeOf(t.aptitudes[distKey]);
+        const dateHtml = tr.year ? `<span class="trophy-date">${escapeHtml(raceDateLabel(tr))}</span>` : "";
         metaHtml = `
+          ${dateHtml}
           <span class="mini-tag" style="background:var(--panel-2);color:var(--ink-dim)">${tr.grade || ""}</span>
           <span class="mini-tag" style="background:var(--${GRADE_INFO[trackGrade].tier})" title="${tr.track} aptitude: ${trackGrade}">${tr.track}</span>
           <span class="mini-tag" style="background:var(--${GRADE_INFO[distGrade].tier})" title="${tr.distance} aptitude: ${distGrade}">${tr.distance}</span>
@@ -545,6 +581,7 @@ function myCardHtml(t) {
   return `
   <div class="mycard">
     <div class="mycard-head">
+      ${iconHtml(t.name, 48)}
       <div class="mycard-name">${escapeHtml(t.name)}</div>
       <button class="btn small ghost" id="del-${t.id}">Remove</button>
     </div>
@@ -558,7 +595,7 @@ function myCardHtml(t) {
       </div>
       <div class="trophy-list">${trophyHtml}</div>
       <div class="add-trophy">
-        <input type="text" id="addt-input-${t.id}" placeholder="Search races (G1–G3) or type a custom trophy" autocomplete="off">
+        <input type="text" id="addt-input-${t.id}" placeholder="${state.settings.allowCustomTrophies ? 'Search races (G1–G3) or type a custom trophy' : 'Search races (G1–G3)'}" autocomplete="off">
         <button class="btn small" id="addt-btn-${t.id}">+ Add</button>
         <div class="race-suggest" id="addt-suggest-${t.id}"></div>
       </div>
@@ -568,7 +605,7 @@ function myCardHtml(t) {
 
 function removeFromMyList(id) {
   state.myList = state.myList.filter(t => t.id !== id);
-  saveState(); renderMyList();
+  saveState(); renderMyList(); renderDatabase();
 }
 function addTrophy(tid, name, meta) {
   name = (name || "").trim();
@@ -576,7 +613,10 @@ function addTrophy(tid, name, meta) {
   const t = state.myList.find(x => x.id === tid);
   if (!t) return;
   const trophy = { id: uid(), name, checked: false };
-  if (meta) { trophy.grade = meta.grade; trophy.track = meta.track; trophy.distance = meta.distance; }
+  if (meta) {
+    trophy.grade = meta.grade; trophy.track = meta.track; trophy.distance = meta.distance;
+    trophy.year = meta.year; trophy.turn = meta.turn; trophy.month = meta.month;
+  }
   t.trophies.push(trophy);
   saveState(); renderMyList();
 }
@@ -595,6 +635,7 @@ function removeTrophy(tid, trid) {
   saveState(); renderMyList();
 }
 function addCustom() {
+  if (!state.settings.allowCustomTrainees) return;
   const input = document.getElementById('custom-name');
   const name = input.value.trim();
   if (!name) { input.focus(); return; }
@@ -621,7 +662,7 @@ function importList(file) {
         if (!t.id || existingIds.has(t.id)) t.id = uid();
         state.myList.push(t);
       });
-      saveState(); renderMyList();
+      saveState(); renderMyList(); renderDatabase();
     } catch (e) {
       alert("Couldn't read that file — expected a Completionist Board export.");
     }
@@ -629,10 +670,34 @@ function importList(file) {
   reader.readAsText(file);
 }
 
+function applySettingsUI() {
+  const trainToggle = document.getElementById('toggle-custom-trainee');
+  const trophyToggle = document.getElementById('toggle-custom-trophy');
+  const trainRow = document.getElementById('custom-trainee-row');
+
+  if (trainToggle) {
+    trainToggle.textContent = `Custom trainees: ${state.settings.allowCustomTrainees ? 'On' : 'Off'}`;
+    trainToggle.classList.toggle('off', !state.settings.allowCustomTrainees);
+  }
+  if (trophyToggle) {
+    trophyToggle.textContent = `Custom trophies: ${state.settings.allowCustomTrophies ? 'On' : 'Off'}`;
+    trophyToggle.classList.toggle('off', !state.settings.allowCustomTrophies);
+  }
+  if (trainRow) {
+    trainRow.style.display = state.settings.allowCustomTrainees ? '' : 'none';
+  }
+  document.querySelectorAll('[id^="addt-input-"]').forEach(inp => {
+    inp.placeholder = state.settings.allowCustomTrophies
+      ? "Search races (G1–G3) or type a custom trophy"
+      : "Search races (G1–G3)";
+  });
+}
+
 async function init() {
   await loadState();
   renderDatabase();
   renderMyList();
+  applySettingsUI();
 
   document.getElementById('db-search').addEventListener('input', renderDatabase);
   document.getElementById('custom-add-btn').addEventListener('click', addCustom);
@@ -641,6 +706,17 @@ async function init() {
   document.getElementById('import-file').addEventListener('change', e => {
     if (e.target.files[0]) importList(e.target.files[0]);
     e.target.value = "";
+  });
+
+  const trainToggle = document.getElementById('toggle-custom-trainee');
+  const trophyToggle = document.getElementById('toggle-custom-trophy');
+  if (trainToggle) trainToggle.addEventListener('click', () => {
+    state.settings.allowCustomTrainees = !state.settings.allowCustomTrainees;
+    saveState(); applySettingsUI();
+  });
+  if (trophyToggle) trophyToggle.addEventListener('click', () => {
+    state.settings.allowCustomTrophies = !state.settings.allowCustomTrophies;
+    saveState(); applySettingsUI();
   });
 }
 init();

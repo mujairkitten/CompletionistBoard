@@ -17,6 +17,8 @@
       <h1>Completionist Board</h1>
     </div>
     <div class="topbar-actions">
+      <button class="btn toggle-btn" id="toggle-custom-trainee">Custom trainees: On</button>
+      <button class="btn toggle-btn" id="toggle-custom-trophy">Custom trophies: On</button>
       <button class="btn" id="export-btn">Export list</button>
       <label class="btn" for="import-file">Import list</label>
       <input type="file" id="import-file" accept=".json">
@@ -47,7 +49,7 @@
       <h2>My List</h2>
       <span class="desc">Track aptitudes and trophies toward Completionist.</span>
     </div>
-    <div class="search-row">
+    <div class="search-row" id="custom-trainee-row">
       <input type="text" class="search" id="custom-name" placeholder="Add a custom trainee by name…" style="max-width:260px;">
       <button class="btn" id="custom-add-btn">+ Add custom</button>
     </div>
@@ -60,7 +62,7 @@
     Where a costume shifts an aptitude (e.g. Haru Urara's Mile), the chip shows both grades — hover it for which costume does what.<br>
     Race calendar (152 G1–G3 races) powers the trophy search on each My List card — matched races are tagged with track/distance aptitude risk.<br>
     Your list is stored privately in this browser session. Use Export/Import to move it between sessions or devices.<br><br>
-    2026, Mujairkitten. Made with Claude Sonnet 5. Not affiliated with Cygames.
+    2026, Mujairkitten. Made with Claude Sonnet 5. Not affiliated with Cygames. Source code is licensed under GPL-3. Uma icons are subject to Cygames, used fairly according to <a href="https://umamusume.com/fan-createdguide">Cygames' Fan Content Guide.</a>
   </footer>
 </div>
 

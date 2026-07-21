@@ -1,9 +1,3 @@
-# CompletionistBoard
-
-###### A handy web to track your umas' path toward the Completionist title
-
-
-
 # About icons
 
 #### Those icons are exempt from GPL-3 license, as those aren't mine.
