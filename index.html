@@ -17,17 +17,41 @@
       <h1>Completionist Board</h1>
     </div>
     <div class="topbar-actions">
-      <button class="btn toggle-btn" id="toggle-custom-trainee">Custom trainees: On</button>
-      <button class="btn toggle-btn" id="toggle-custom-trophy">Custom trophies: On</button>
       <button class="btn" id="export-btn">Export list</button>
       <label class="btn" for="import-file">Import list</label>
       <input type="file" id="import-file" accept=".json">
+      <div class="settings-wrap">
+        <button class="btn icon-btn" id="settings-btn" aria-label="Settings" title="Settings">⚙</button>
+        <div class="settings-panel" id="settings-panel">
+          <div class="settings-row">
+            <span>Light mode</span>
+            <label class="switch"><input type="checkbox" id="toggle-light-mode"><span class="switch-slider"></span></label>
+          </div>
+          <div class="settings-row">
+            <span>Custom trainees</span>
+            <label class="switch"><input type="checkbox" id="toggle-custom-trainee"><span class="switch-slider"></span></label>
+          </div>
+          <div class="settings-row">
+            <span>Custom trophies</span>
+            <label class="switch"><input type="checkbox" id="toggle-custom-trophy"><span class="switch-slider"></span></label>
+          </div>
+          <div class="settings-row">
+            <span>Calendar View</span>
+            <label class="switch"><input type="checkbox" id="toggle-calendar-view"><span class="switch-slider"></span></label>
+          </div>
+          <div class="settings-row">
+            <span>Inline calendars</span>
+            <label class="switch"><input type="checkbox" id="toggle-inline-calendar"><span class="switch-slider"></span></label>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
 <div class="wrap">
 
+<div id="standard-view">
   <section class="block">
     <div class="block-head">
       <span class="gate-badge" id="db-gate">0</span>
@@ -57,13 +81,19 @@
     <div class="empty-note" id="mylist-empty" style="display:none;">Your list is empty — add trainees from the database above, or add a custom one.</div>
   </section>
 
-  <footer>
-    Character aptitudes consolidated from the Umamusume Wiki trainee tables across all Global costumes. Latest Update: July 20, 2026 (Copano Rickey).<br>
-    Where a costume shifts an aptitude (e.g. Haru Urara's Mile), the chip shows both grades — hover it for which costume does what.<br>
-    Race calendar (152 G1–G3 races) powers the trophy search on each My List card — matched races are tagged with track/distance aptitude risk.<br>
-    Your list is stored privately in this browser session. Use Export/Import to move it between sessions or devices.<br><br>
-    2026, Mujairkitten. Made with Claude Sonnet 5. Not affiliated with Cygames. Source code is licensed under GPL-3. Uma icons are subject to Cygames, used fairly according to <a href="https://umamusume.com/fan-createdguide">Cygames' Fan Content Guide.</a>
-  </footer>
+  <div class="about-box">
+    <div class="cal-tool-box-title">About</div>
+    <div class="about-text">
+      <p>Character aptitudes consolidated from the Umamusume Wiki trainee tables across all Global costumes. Latest update: July 20, 2026 (Copano Rickey).</p>
+      <p>Race calendar sourced from a 152-race G1–G3 dataset. Out-of-Bond holds custom (non-race) trophies, which have no fixed date.</p>
+      <p>Calendar View and Inline calendars are experimental toggles. Your list is stored privately in this browser — use Export/Import to move it between sessions or devices.</p>
+      <p>2026, Mujairkitten. Made with Claude Sonnet 5. Not affiliated with Cygames. Source code is licensed under GPL-3. Uma icons are subject to Cygames, used fairly according to <a href="https://umamusume.com/fan-createdguide">Cygames' Fan Content Guide.</a></p>
+    </div>
+  </div>
+</div>
+
+<div id="calendar-view" style="display:none;"></div>
+
 </div>
 
 <div id="tooltip"></div>

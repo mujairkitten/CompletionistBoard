@@ -236,13 +236,13 @@ const RACES = [
   {grade:'G3',year:'Classic, Senior',month:'November',turn:'Early',name:'Fukushima Kinen',track:'Turf',distance:'Medium'},
   {grade:'G3',year:'Junior',month:'November',turn:'Late',name:'Tokyo Sports Hai Junior Stakes',track:'Turf',distance:'Mile'},
   {grade:'G3',year:'Junior',month:'November',turn:'Late',name:'Kyoto Junior Stakes',track:'Turf',distance:'Medium'},
-  {grade:'G3',year:'Classic',month:'November',turn:'Late',name:'Keihan Hai',track:'Turf',distance:'Sprint'},
+  {grade:'G3',year:'Classic, Senior',month:'November',turn:'Late',name:'Keihan Hai',track:'Turf',distance:'Sprint'},
   {grade:'G3',year:'Classic, Senior',month:'December',turn:'Early',name:'Challenge Cup',track:'Turf',distance:'Medium'},
   {grade:'G3',year:'Classic, Senior',month:'December',turn:'Early',name:'Chunichi Shimbun Hai',track:'Turf',distance:'Medium'},
   {grade:'G3',year:'Classic, Senior',month:'December',turn:'Early',name:'Capella Stakes',track:'Dirt',distance:'Sprint'},
   {grade:'G3',year:'Classic, Senior',month:'December',turn:'Early',name:'Turquoise Stakes',track:'Turf',distance:'Mile'},
   {grade:'G3',year:'Senior',month:'January',turn:'Late',name:'TCK Jo-o Hai',track:'Dirt',distance:'Mile'},
-  {grade:'G3',year:'Classic, Senior',month:'April',turn:'Late',name:'Tokyo Sprint',track:'Dirt',distance:'Sprint'},
+  {grade:'G3',year:'Senior',month:'April',turn:'Late',name:'Tokyo Sprint',track:'Dirt',distance:'Sprint'},
   {grade:'G3',year:'Classic, Senior',month:'July',turn:'Early',name:'Sparking Lady Cup',track:'Dirt',distance:'Medium'},
   {grade:'G3',year:'Classic, Senior',month:'April',turn:'Early',name:'Marine Cup',track:'Dirt',distance:'Mile'},
   {grade:'G3',year:'Classic, Senior',month:'December',turn:'Early',name:'Queen Sho',track:'Dirt',distance:'Mile'},
@@ -253,7 +253,78 @@ const RACES = [
 const TRACK_TO_APT_KEY = { Turf: "turf", Dirt: "dirt" };
 const DIST_TO_APT_KEY = { Sprint: "short", Mile: "mile", Medium: "medium", Long: "long" };
 
-let state = { myList: [], settings: { allowCustomTrainees: true, allowCustomTrophies: true } };
+// ---- Calendar (experimental) ----
+// 3 in-career years, 12 months x Early/Late = 24 date slots each.
+// "Out-of-Bond" has no fixed date, so it isn't part of the grid.
+const CAL_YEAR_GROUPS = ["Junior", "Classic", "Senior"];
+const CAL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const CAL_TURNS = ["Early", "Late"];
+
+function raceAppliesToYear(race, yearGroup) {
+  return race.year.split(",").map(s => s.trim()).includes(yearGroup);
+}
+function calSlotKey(month, turn) { return `${month}|${turn}`; }
+function racesForSlot(yearGroup, month, turn) {
+  return RACES.filter(r => raceAppliesToYear(r, yearGroup) && r.month === month && r.turn === turn);
+}
+function trophyForRace(t, raceName) {
+  return t.trophies.find(x => x.name.toLowerCase() === raceName.toLowerCase());
+}
+function isRaceDone(t, raceName) {
+  const tr = trophyForRace(t, raceName);
+  return !!(tr && tr.checked);
+}
+// Pending order for a slot: any saved custom order first, then remaining races in dataset order.
+function pendingOrderForSlot(t, slotKey, pendingRaces) {
+  if (!t.calendarOrder) t.calendarOrder = {};
+  const saved = t.calendarOrder[slotKey] || [];
+  const savedRaces = saved.map(n => pendingRaces.find(r => r.name === n)).filter(Boolean);
+  const savedNames = new Set(savedRaces.map(r => r.name));
+  const rest = pendingRaces.filter(r => !savedNames.has(r.name));
+  return [...savedRaces, ...rest];
+}
+// Reorders a slot's pending list by moving draggedName to just before targetName
+// (or to the end, if targetName is null — e.g. dropped on empty cell space).
+function reorderRaceInSlot(t, slotKey, allSlotRaces, draggedName, targetName) {
+  const pending = allSlotRaces.filter(r => !isRaceDone(t, r.name));
+  let ordered = pendingOrderForSlot(t, slotKey, pending).map(r => r.name);
+  ordered = ordered.filter(n => n !== draggedName);
+  if (targetName && ordered.includes(targetName)) {
+    ordered.splice(ordered.indexOf(targetName), 0, draggedName);
+  } else {
+    ordered.push(draggedName);
+  }
+  if (!t.calendarOrder) t.calendarOrder = {};
+  t.calendarOrder[slotKey] = ordered;
+  saveState();
+}
+let dragCtx = null;
+function calendarToggleRace(t, race) {
+  let tr = trophyForRace(t, race.name);
+  if (!tr) {
+    tr = { id: uid(), name: race.name, checked: true, grade: race.grade, track: race.track, distance: race.distance, year: race.year, turn: race.turn, month: race.month };
+    t.trophies.push(tr);
+  } else {
+    tr.checked = !tr.checked;
+  }
+  saveState();
+}
+
+
+let state = {
+  myList: [],
+  settings: {
+    allowCustomTrainees: true,
+    allowCustomTrophies: true,
+    calendarViewMode: false,
+    inlineCalendar: false,
+    lightMode: false,
+    activeTraineeId: null
+  }
+};
+// Runtime-only UI state (not persisted): which cards have their inline calendar open, and which tab each shows.
+let openInlineCals = new Set();
+let inlineCalTab = {};
 function uid() { return Math.random().toString(36).slice(2, 9); }
 
 async function loadState() {
@@ -269,6 +340,10 @@ async function loadState() {
   if (!state.settings) {
     state.settings = { allowCustomTrainees: true, allowCustomTrophies: true };
   }
+  if (state.settings.calendarViewMode === undefined) state.settings.calendarViewMode = false;
+  if (state.settings.inlineCalendar === undefined) state.settings.inlineCalendar = false;
+  if (state.settings.lightMode === undefined) state.settings.lightMode = false;
+  if (state.settings.activeTraineeId === undefined) state.settings.activeTraineeId = null;
 }
 
 async function saveState() {
@@ -327,19 +402,22 @@ function chipHtml(apt, key) {
   const alt = altOf(value);
   const tier = GRADE_INFO[grade].tier;
   const label = `${cat.label} ${grade}${alt ? '/' + alt.alt : ''}`;
-  let style = `background:var(--${tier});--chip-glow:color-mix(in srgb, var(--${tier}) 55%, transparent);`;
+  const borderMix = `color-mix(in srgb, var(--${tier}) 55%, transparent)`;
+  const glowMix = `color-mix(in srgb, var(--${tier}) 80%, transparent)`;
+  let bg = `color-mix(in srgb, var(--${tier}) 24%, transparent)`;
   if (alt) {
-    style = `--split-a:var(--${tier});--split-b:var(--${GRADE_INFO[alt.alt].tier});--chip-glow:color-mix(in srgb, var(--${tier}) 45%, transparent);`;
+    const altTier = GRADE_INFO[alt.alt].tier;
+    bg = `linear-gradient(90deg, color-mix(in srgb, var(--${tier}) 26%, transparent) 50%, color-mix(in srgb, var(--${altTier}) 26%, transparent) 50%)`;
   }
-  return `<button class="chip${alt ? ' split' : ''}" style="${style}"
+  const style = `--chip-bg:${bg};--chip-border:${borderMix};--chip-glow:${glowMix};`;
+  return `<button class="chip" style="${style}"
             data-cat="${key}" data-json='${JSON.stringify(value)}'
           >${label}</button>`;
 }
 function aptGroupsHtml(apt) {
   return `<div class="apt-groups">
-    <div class="apt-group">${SURFACE_KEYS.map(k => chipHtml(apt, k)).join("")}</div>
-    <div class="apt-divider"></div>
-    <div class="apt-group">${DISTANCE_KEYS.map(k => chipHtml(apt, k)).join("")}</div>
+    <div class="apt-container">${SURFACE_KEYS.map(k => chipHtml(apt, k)).join("")}</div>
+    <div class="apt-container">${DISTANCE_KEYS.map(k => chipHtml(apt, k)).join("")}</div>
   </div>`;
 }
 function wireChips(root) {
@@ -366,6 +444,134 @@ function iconHtml(name, size) {
 function raceDateLabel(r) {
   const yearLabel = r.year.replace(/,\s*/g, '/');
   return `${yearLabel} ${r.turn} ${r.month}`;
+}
+
+function calGradeColor(grade) {
+  if (grade === 'G1') return 'var(--s)';
+  if (grade === 'G2') return 'var(--accent2)';
+  return 'var(--accent)'; // G3
+}
+function calRaceRowHtml(r, opts) {
+  const draggable = !!opts.draggable;
+  const checked = !!opts.checked;
+  return `
+    <div class="cal-race-row${checked ? ' done' : ''}" ${draggable ? 'draggable="true"' : ''} data-race="${escapeHtml(r.name)}">
+      ${draggable ? '<span class="drag-handle" title="Drag to reorder">⠿</span>' : ''}
+      <input type="checkbox" class="cal-tick" data-race="${escapeHtml(r.name)}" ${checked ? 'checked' : ''}>
+      <span class="cal-grade-tag" style="background:${calGradeColor(r.grade)}">${r.grade}</span>
+      <span class="cal-race-info">
+        <span class="cal-race-name">${escapeHtml(r.name)}</span>
+        <span class="cal-race-sub">${r.track} · ${r.distance}</span>
+      </span>
+    </div>`;
+}
+
+// ---- Calendar rendering (shared by the full Calendar View and the inline per-card calendar) ----
+function calCellHtml(t, yearGroup, month, turn) {
+  const slotKey = calSlotKey(month, turn);
+  const slotRaces = racesForSlot(yearGroup, month, turn);
+  const done = slotRaces.filter(r => isRaceDone(t, r.name));
+  const pending = pendingOrderForSlot(t, slotKey, slotRaces.filter(r => !isRaceDone(t, r.name)));
+  const label = `<div class="cal-cell-label">${month.slice(0, 3)} · ${turn}</div>`;
+
+  if (slotRaces.length === 0) {
+    return `<div class="cal-cell cal-cell-empty" data-slot="${slotKey}" data-year="${yearGroup}">${label}</div>`;
+  }
+
+  const pendingHtml = pending.map(r => calRaceRowHtml(r, { draggable: true, checked: false })).join("");
+
+  const doneHtml = done.length ? `<div class="cal-done-divider">${done.map(r => calRaceRowHtml(r, { draggable: false, checked: true })).join("")}</div>` : "";
+
+  return `<div class="cal-cell" data-slot="${slotKey}" data-year="${yearGroup}">${label}${pendingHtml}${doneHtml}</div>`;
+}
+
+function calGridHtml(t, yearGroup) {
+  const slots = [];
+  CAL_MONTHS.forEach(month => CAL_TURNS.forEach(turn => slots.push({ month, turn })));
+  const cellsHtml = slots.map(s => calCellHtml(t, yearGroup, s.month, s.turn)).join("");
+  return `<div class="cal-grid-46">${cellsHtml}</div>`;
+}
+
+function calOobHtml(t) {
+  const oob = t.trophies.filter(tr => !tr.track);
+  if (oob.length === 0) {
+    return `<div class="empty-note" style="margin-top:8px;">No custom (non-calendar) trophies logged for this trainee yet.</div>`;
+  }
+  return `<div class="cal-oob-list">${oob.map(tr => `
+    <div class="trophy-item ${tr.checked ? 'checked' : ''}">
+      <input type="checkbox" class="cal-oob-tick" data-tid="${tr.id}" ${tr.checked ? 'checked' : ''}>
+      <span>${escapeHtml(tr.name)}</span>
+    </div>`).join("")}</div>`;
+}
+
+function calPageHtml(t, tab) {
+  if (tab === "OoB") return calOobHtml(t);
+  return calGridHtml(t, tab);
+}
+
+function wireCalPage(root, t, onChange) {
+  root.querySelectorAll('.cal-tick').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const race = RACES.find(r => r.name === cb.dataset.race);
+      if (race) { calendarToggleRace(t, race); onChange(); }
+    });
+  });
+
+  root.querySelectorAll('.cal-race-row[draggable="true"]').forEach(row => {
+    row.addEventListener('dragstart', (e) => {
+      const cell = row.closest('.cal-cell');
+      dragCtx = { slotKey: cell.dataset.slot, raceName: row.dataset.race };
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', row.dataset.race);
+      row.classList.add('dragging');
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      root.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+      dragCtx = null;
+    });
+    row.addEventListener('dragover', (e) => {
+      if (!dragCtx) return;
+      e.preventDefault();
+      row.classList.add('drag-over');
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+    row.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      row.classList.remove('drag-over');
+      if (!dragCtx) return;
+      const cell = row.closest('.cal-cell');
+      const slotKey = cell.dataset.slot;
+      if (slotKey !== dragCtx.slotKey) return; // reordering only makes sense within the same date slot
+      const yearGroup = cell.dataset.year;
+      const [month, turn] = slotKey.split('|');
+      reorderRaceInSlot(t, slotKey, racesForSlot(yearGroup, month, turn), dragCtx.raceName, row.dataset.race);
+      onChange();
+    });
+  });
+
+  // Dropping on empty cell space (not on a specific row) sends the race to the end of the pending list.
+  root.querySelectorAll('.cal-cell').forEach(cell => {
+    cell.addEventListener('dragover', (e) => { if (dragCtx) e.preventDefault(); });
+    cell.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (!dragCtx) return;
+      const slotKey = cell.dataset.slot;
+      if (slotKey !== dragCtx.slotKey) return;
+      const yearGroup = cell.dataset.year;
+      const [month, turn] = slotKey.split('|');
+      reorderRaceInSlot(t, slotKey, racesForSlot(yearGroup, month, turn), dragCtx.raceName, null);
+      onChange();
+    });
+  });
+
+  root.querySelectorAll('.cal-oob-tick').forEach(cb => {
+    cb.addEventListener('change', () => {
+      toggleTrophy(t.id, cb.dataset.tid);
+      onChange();
+    });
+  });
 }
 
 function renderDatabase() {
@@ -471,6 +677,23 @@ function renderMyList() {
       const rm = document.getElementById(`rm-${t.id}-${tr.id}`);
       if (rm) rm.addEventListener('click', () => removeTrophy(t.id, tr.id));
     });
+
+    if (state.settings.inlineCalendar) {
+      const calBtn = document.getElementById(`calbtn-${t.id}`);
+      if (calBtn) calBtn.addEventListener('click', () => {
+        if (openInlineCals.has(t.id)) openInlineCals.delete(t.id); else openInlineCals.add(t.id);
+        renderMyList();
+      });
+      const tabsBox = document.getElementById(`caltabs-${t.id}`);
+      if (tabsBox) tabsBox.querySelectorAll('.cal-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          inlineCalTab[t.id] = btn.dataset.tab;
+          renderMyList();
+        });
+      });
+      const pageBox = document.getElementById(`calpage-${t.id}`);
+      if (pageBox) wireCalPage(pageBox, t, renderMyList);
+    }
   });
 }
 
@@ -578,6 +801,17 @@ function myCardHtml(t) {
     }).join("")
     : `<div style="font-size:12px;color:var(--ink-faint);font-style:italic;">No races logged yet.</div>`;
 
+  const inlineCalHtml = state.settings.inlineCalendar ? `
+    <div class="inline-cal">
+      <button class="inline-cal-toggle" id="calbtn-${t.id}">📅 Calendar <span class="chev">${openInlineCals.has(t.id) ? '▾' : '▸'}</span></button>
+      <div class="inline-cal-body ${openInlineCals.has(t.id) ? 'open' : ''}" id="calbody-${t.id}">
+        <div class="cal-tabs" id="caltabs-${t.id}">
+          ${[...CAL_YEAR_GROUPS, "OoB"].map(tab => `<button class="cal-tab-btn ${((inlineCalTab[t.id] || "Junior") === tab) ? 'active' : ''}" data-tab="${tab}">${tab === "OoB" ? "Out-of-Bond" : tab}</button>`).join("")}
+        </div>
+        <div class="cal-page" id="calpage-${t.id}">${calPageHtml(t, inlineCalTab[t.id] || "Junior")}</div>
+      </div>
+    </div>` : "";
+
   return `
   <div class="mycard">
     <div class="mycard-head">
@@ -600,6 +834,7 @@ function myCardHtml(t) {
         <div class="race-suggest" id="addt-suggest-${t.id}"></div>
       </div>
     </div>
+    ${inlineCalHtml}
   </div>`;
 }
 
@@ -670,19 +905,240 @@ function importList(file) {
   reader.readAsText(file);
 }
 
+// ---- Full Calendar View (experimental alt layout) ----
+let calViewTab = "Junior";
+
+let calTraineePanelOpen = false;
+let calTraineeSearch = "";
+let calTraineeSort = "default"; // default | az | za
+
+// Fallback only — the About box normally mirrors the live #standard-view .about-text content
+// (see calSidebarHtml) so edits made there automatically show up in Calendar View too.
+const ABOUT_HTML_LINES = [
+  "Character aptitudes consolidated from the Umamusume Wiki trainee tables across all Global costumes. Latest update: July 20, 2026 (Copano Rickey).",
+  "Race calendar sourced from a 152-race G1–G3 dataset. Out-of-Bond holds custom (non-race) trophies, which have no fixed date.",
+  "Calendar View and Inline calendars are experimental toggles. Your list is stored privately in this browser — use Export/Import to move it between sessions or devices.",
+  "2026, Mujairkitten. Made with Claude Sonnet 5. Not affiliated with Cygames. Source code is licensed under GPL-3. Uma icons are subject to Cygames, used fairly according to <a href=\"https://umamusume.com/fan-createdguide\">Cygames' Fan Content Guide.</a>"
+];
+
+function sortTraineeRows(rows) {
+  if (calTraineeSort === "az") return [...rows].sort((a, b) => a.name.localeCompare(b.name));
+  if (calTraineeSort === "za") return [...rows].sort((a, b) => b.name.localeCompare(a.name));
+  return rows;
+}
+
+function calTraineePanelHtml(activeTrainee) {
+  const q = calTraineeSearch.trim().toLowerCase();
+  const mineRows = sortTraineeRows(state.myList.filter(t => t.name.toLowerCase().includes(q)));
+  const myNames = new Set(state.myList.map(t => t.name.toLowerCase()));
+  const otherRows = sortTraineeRows(DATABASE.filter(d => !myNames.has(d.name.toLowerCase()) && d.name.toLowerCase().includes(q)));
+
+  const mineHtml = mineRows.map(t => `
+    <div class="cal-trainee-row ${t.id === activeTrainee.id ? 'active' : ''}" data-switch="${t.id}">
+      ${iconHtml(t.name, 28)}
+      <span class="cal-trainee-row-name">${escapeHtml(t.name)}</span>
+      ${t.id === activeTrainee.id ? '<span class="cal-trainee-current">Current</span>' : ''}
+    </div>`).join("") || `<div class="cal-trainee-empty">No matches in My List.</div>`;
+
+  const otherHtml = otherRows.map(d => `
+    <div class="cal-trainee-row" data-name="${escapeHtml(d.name)}">
+      ${iconHtml(d.name, 28)}
+      <span class="cal-trainee-row-name">${escapeHtml(d.name)}</span>
+      <button class="btn small" data-addswitch="${escapeHtml(d.name)}">+ Add to my list</button>
+    </div>`).join("") || `<div class="cal-trainee-empty">No matches.</div>`;
+
+  return `
+  <div class="cal-trainee-panel" id="cal-trainee-panel">
+    <input type="text" class="search" id="cal-trainee-search" placeholder="Search trainees…" value="${escapeHtml(calTraineeSearch)}">
+    <div class="cal-trainee-sort">
+      <button class="sort-btn ${calTraineeSort === 'default' ? 'active' : ''}" data-sort="default">Default</button>
+      <button class="sort-btn ${calTraineeSort === 'az' ? 'active' : ''}" data-sort="az">A–Z</button>
+      <button class="sort-btn ${calTraineeSort === 'za' ? 'active' : ''}" data-sort="za">Z–A</button>
+    </div>
+    <div class="cal-trainee-group-label">In My List</div>
+    <div class="cal-trainee-list">${mineHtml}</div>
+    <div class="cal-trainee-group-label">All trainees</div>
+    <div class="cal-trainee-list">${otherHtml}</div>
+  </div>`;
+}
+
+function calSidebarHtml(activeTrainee) {
+  return `
+  <div class="cal-sidebar">
+    <div class="cal-trainee-box">
+      ${iconHtml(activeTrainee.name, 96)}
+      <button class="cal-trainee-name-btn" id="cal-trainee-btn">
+        <span class="cal-trainee-name">${escapeHtml(activeTrainee.name)}</span>
+        <span class="cal-trainee-arrow">▾</span>
+      </button>
+      ${calTraineePanelOpen ? calTraineePanelHtml(activeTrainee) : ''}
+    </div>
+    <div class="cal-tool-box">
+      <div class="cal-tool-box-title">Aptitude chips</div>
+      ${aptGroupsHtml(activeTrainee.aptitudes)}
+    </div>
+    <div class="cal-tool-box">
+      <div class="cal-tool-box-title">More tools</div>
+      <div class="cal-tool-list">
+        <button class="btn small" id="cal-export-btn">Export list</button>
+        <label class="btn small" for="cal-import-file">Import list</label>
+        <input type="file" id="cal-import-file" accept=".json">
+        <button class="btn small ghost" id="cal-exit-btn">Exit Calendar View</button>
+      </div>
+    </div>
+    <div class="cal-tool-box">
+      <div class="cal-tool-box-title">About</div>
+      <div class="about-text">${getAboutHtml()}</div>
+    </div>
+  </div>`;
+}
+
+function getAboutHtml() {
+  const live = document.querySelector('#standard-view .about-text');
+  if (live && live.innerHTML.trim()) return live.innerHTML;
+  return ABOUT_HTML_LINES.map(l => `<p>${l}</p>`).join("");
+}
+
+function wireCalTraineePanel(host, activeTrainee) {
+  const btn = document.getElementById('cal-trainee-btn');
+  if (btn) btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    calTraineePanelOpen = !calTraineePanelOpen;
+    renderCalendarView();
+  });
+
+  const panel = document.getElementById('cal-trainee-panel');
+  if (!panel) return;
+
+  panel.addEventListener('click', e => e.stopPropagation());
+
+  const searchInput = document.getElementById('cal-trainee-search');
+  if (searchInput) {
+    searchInput.focus();
+    searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+    searchInput.addEventListener('input', () => {
+      calTraineeSearch = searchInput.value;
+      renderCalendarView();
+    });
+  }
+
+  panel.querySelectorAll('.sort-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      calTraineeSort = b.dataset.sort;
+      renderCalendarView();
+    });
+  });
+
+  panel.querySelectorAll('[data-switch]').forEach(row => {
+    row.addEventListener('click', () => {
+      state.settings.activeTraineeId = row.dataset.switch;
+      calTraineePanelOpen = false;
+      saveState();
+      renderCalendarView();
+    });
+  });
+
+  panel.querySelectorAll('[data-addswitch]').forEach(b => {
+    b.addEventListener('click', () => {
+      const d = DATABASE.find(x => x.name === b.dataset.addswitch);
+      if (!d) return;
+      addToMyList(d.name, JSON.parse(JSON.stringify(d.apt)));
+      const added = state.myList[state.myList.length - 1];
+      state.settings.activeTraineeId = added.id;
+      calTraineePanelOpen = false;
+      saveState();
+      renderCalendarView();
+    });
+  });
+}
+
+function renderCalendarView() {
+  const host = document.getElementById('calendar-view');
+  if (!host) return;
+
+  if (state.myList.length === 0) {
+    host.innerHTML = `<div class="empty-note" style="margin:30px 0;">Add at least one trainee to My List first — Calendar View needs someone to track.</div>`;
+    return;
+  }
+
+  let activeTrainee = state.myList.find(t => t.id === state.settings.activeTraineeId);
+  if (!activeTrainee) {
+    activeTrainee = state.myList[0];
+    state.settings.activeTraineeId = activeTrainee.id;
+    saveState();
+  }
+
+  host.innerHTML = `
+    <div class="calendar-layout">
+      ${calSidebarHtml(activeTrainee)}
+      <div class="cal-main">
+        <div class="cal-tabs cal-tabs-main" id="cal-main-tabs">
+          ${[...CAL_YEAR_GROUPS, "OoB"].map(tab => `<button class="cal-tab-btn ${calViewTab === tab ? 'active' : ''}" data-tab="${tab}">${tab === "OoB" ? "Out-of-Bond" : tab}</button>`).join("")}
+        </div>
+        <div class="cal-page" id="cal-main-page">${calPageHtml(activeTrainee, calViewTab)}</div>
+      </div>
+    </div>`;
+
+  wireChips(host);
+  wireCalTraineePanel(host, activeTrainee);
+
+  document.getElementById('cal-main-tabs').querySelectorAll('.cal-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      calViewTab = btn.dataset.tab;
+      renderCalendarView();
+    });
+  });
+
+  wireCalPage(document.getElementById('cal-main-page'), activeTrainee, renderCalendarView);
+
+  const exportBtn = document.getElementById('cal-export-btn');
+  if (exportBtn) exportBtn.addEventListener('click', exportList);
+  const importFile = document.getElementById('cal-import-file');
+  if (importFile) importFile.addEventListener('change', e => {
+    if (e.target.files[0]) importList(e.target.files[0]);
+    e.target.value = "";
+  });
+  const exitBtn = document.getElementById('cal-exit-btn');
+  if (exitBtn) exitBtn.addEventListener('click', () => {
+    state.settings.calendarViewMode = false;
+    saveState();
+    applySettingsUI();
+    renderMainView();
+  });
+}
+
+// Shows either the standard Database + My List layout, or the experimental Calendar View.
+function renderMainView() {
+  const standard = document.getElementById('standard-view');
+  const calView = document.getElementById('calendar-view');
+  if (state.settings.calendarViewMode) {
+    if (standard) standard.style.display = 'none';
+    if (calView) calView.style.display = '';
+    renderCalendarView();
+  } else {
+    if (standard) standard.style.display = '';
+    if (calView) calView.style.display = 'none';
+    renderDatabase();
+    renderMyList();
+  }
+}
+
 function applySettingsUI() {
+  const lightToggle = document.getElementById('toggle-light-mode');
   const trainToggle = document.getElementById('toggle-custom-trainee');
   const trophyToggle = document.getElementById('toggle-custom-trophy');
+  const calViewToggle = document.getElementById('toggle-calendar-view');
+  const inlineCalToggle = document.getElementById('toggle-inline-calendar');
   const trainRow = document.getElementById('custom-trainee-row');
 
-  if (trainToggle) {
-    trainToggle.textContent = `Custom trainees: ${state.settings.allowCustomTrainees ? 'On' : 'Off'}`;
-    trainToggle.classList.toggle('off', !state.settings.allowCustomTrainees);
-  }
-  if (trophyToggle) {
-    trophyToggle.textContent = `Custom trophies: ${state.settings.allowCustomTrophies ? 'On' : 'Off'}`;
-    trophyToggle.classList.toggle('off', !state.settings.allowCustomTrophies);
-  }
+  document.body.classList.toggle('light', !!state.settings.lightMode);
+
+  if (lightToggle) lightToggle.checked = !!state.settings.lightMode;
+  if (trainToggle) trainToggle.checked = !!state.settings.allowCustomTrainees;
+  if (trophyToggle) trophyToggle.checked = !!state.settings.allowCustomTrophies;
+  if (calViewToggle) calViewToggle.checked = !!state.settings.calendarViewMode;
+  if (inlineCalToggle) inlineCalToggle.checked = !!state.settings.inlineCalendar;
+
   if (trainRow) {
     trainRow.style.display = state.settings.allowCustomTrainees ? '' : 'none';
   }
@@ -693,11 +1149,15 @@ function applySettingsUI() {
   });
 }
 
+function closeSettingsPanel() {
+  const panel = document.getElementById('settings-panel');
+  if (panel) panel.classList.remove('show');
+}
+
 async function init() {
   await loadState();
-  renderDatabase();
-  renderMyList();
   applySettingsUI();
+  renderMainView();
 
   document.getElementById('db-search').addEventListener('input', renderDatabase);
   document.getElementById('custom-add-btn').addEventListener('click', addCustom);
@@ -708,15 +1168,49 @@ async function init() {
     e.target.value = "";
   });
 
+  const settingsBtn = document.getElementById('settings-btn');
+  const settingsPanel = document.getElementById('settings-panel');
+  if (settingsBtn && settingsPanel) {
+    settingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      settingsPanel.classList.toggle('show');
+    });
+    settingsPanel.addEventListener('click', e => e.stopPropagation());
+  }
+
+  const lightToggle = document.getElementById('toggle-light-mode');
   const trainToggle = document.getElementById('toggle-custom-trainee');
   const trophyToggle = document.getElementById('toggle-custom-trophy');
-  if (trainToggle) trainToggle.addEventListener('click', () => {
-    state.settings.allowCustomTrainees = !state.settings.allowCustomTrainees;
+  const calViewToggle = document.getElementById('toggle-calendar-view');
+  const inlineCalToggle = document.getElementById('toggle-inline-calendar');
+
+  if (lightToggle) lightToggle.addEventListener('change', () => {
+    state.settings.lightMode = lightToggle.checked;
     saveState(); applySettingsUI();
   });
-  if (trophyToggle) trophyToggle.addEventListener('click', () => {
-    state.settings.allowCustomTrophies = !state.settings.allowCustomTrophies;
+  if (trainToggle) trainToggle.addEventListener('change', () => {
+    state.settings.allowCustomTrainees = trainToggle.checked;
     saveState(); applySettingsUI();
+  });
+  if (trophyToggle) trophyToggle.addEventListener('change', () => {
+    state.settings.allowCustomTrophies = trophyToggle.checked;
+    saveState(); applySettingsUI();
+  });
+  if (calViewToggle) calViewToggle.addEventListener('change', () => {
+    state.settings.calendarViewMode = calViewToggle.checked;
+    saveState(); applySettingsUI(); renderMainView();
+  });
+  if (inlineCalToggle) inlineCalToggle.addEventListener('change', () => {
+    state.settings.inlineCalendar = inlineCalToggle.checked;
+    saveState(); applySettingsUI(); renderMainView();
+  });
+
+  document.addEventListener('click', () => {
+    closeSettingsPanel();
+    if (calTraineePanelOpen) {
+      calTraineePanelOpen = false;
+      renderCalendarView();
+    }
   });
 }
 init();
