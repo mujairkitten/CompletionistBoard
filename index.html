@@ -23,26 +23,40 @@
       <div class="settings-wrap">
         <button class="btn icon-btn" id="settings-btn" aria-label="Settings" title="Settings">⚙</button>
         <div class="settings-panel" id="settings-panel">
+          <div class="settings-group-label">Appearance</div>
           <div class="settings-row">
             <span>Light mode</span>
             <label class="switch"><input type="checkbox" id="toggle-light-mode"><span class="switch-slider"></span></label>
           </div>
+
+          <div class="settings-divider"></div>
+          <div class="settings-group-label">Trainees</div>
           <div class="settings-row">
             <span>Custom trainees</span>
             <label class="switch"><input type="checkbox" id="toggle-custom-trainee"><span class="switch-slider"></span></label>
           </div>
+
+          <div class="settings-divider"></div>
+          <div class="settings-group-label">Trophies &amp; races</div>
           <div class="settings-row">
+            <span>Race search</span>
+            <label class="switch"><input type="checkbox" id="toggle-race-search"><span class="switch-slider"></span></label>
+          </div>
+          <div class="settings-row settings-row-sub" id="toggle-custom-trophy-row">
             <span>Custom trophies</span>
             <label class="switch"><input type="checkbox" id="toggle-custom-trophy"><span class="switch-slider"></span></label>
           </div>
+
+          <div class="settings-divider"></div>
+          <div class="settings-group-label">View</div>
           <div class="settings-row">
             <span>Calendar View</span>
             <label class="switch"><input type="checkbox" id="toggle-calendar-view"><span class="switch-slider"></span></label>
           </div>
-          <div class="settings-row">
-            <span>Inline calendars</span>
-            <label class="switch"><input type="checkbox" id="toggle-inline-calendar"><span class="switch-slider"></span></label>
-          </div>
+
+          <div class="settings-divider"></div>
+          <div class="settings-group-label">Info</div>
+          <button class="btn small settings-about-btn" id="about-btn">About Completionist Board</button>
         </div>
       </div>
     </div>
@@ -61,6 +75,11 @@
     </div>
     <div class="search-row">
       <input class="search" id="db-search" type="text" placeholder="Search the database…">
+      <div class="cal-trainee-sort" id="db-sort">
+        <button class="sort-btn active" data-sort="default">Default</button>
+        <button class="sort-btn" data-sort="az">A–Z</button>
+        <button class="sort-btn" data-sort="za">Z–A</button>
+      </div>
     </div>
     <div class="db-grid" id="db-grid"></div>
   </section>
@@ -80,20 +99,26 @@
     <div class="mylist" id="mylist"></div>
     <div class="empty-note" id="mylist-empty" style="display:none;">Your list is empty — add trainees from the database above, or add a custom one.</div>
   </section>
-
-  <div class="about-box">
-    <div class="cal-tool-box-title">About</div>
-    <div class="about-text">
-      <p>Character aptitudes consolidated from the Umamusume Wiki trainee tables across all Global costumes. Latest update: July 20, 2026 (Copano Rickey).</p>
-      <p>Race calendar sourced from a 152-race G1–G3 dataset. Out-of-Bond holds custom (non-race) trophies, which have no fixed date.</p>
-      <p>Calendar View and Inline calendars are experimental toggles. Your list is stored privately in this browser — use Export/Import to move it between sessions or devices.</p>
-      <p>2026, Mujairkitten. Made with Claude Sonnet 5. Not affiliated with Cygames. Source code is licensed under GPL-3. Uma icons are subject to Cygames, used fairly according to <a href="https://umamusume.com/fan-createdguide">Cygames' Fan Content Guide.</a></p>
-    </div>
-  </div>
 </div>
 
 <div id="calendar-view" style="display:none;"></div>
 
+</div>
+
+<div class="modal-overlay" id="about-overlay">
+  <div class="modal-box" id="about-modal">
+    <div class="modal-head">
+      <span class="modal-title">About</span>
+      <button class="modal-close" id="about-close" aria-label="Close">✕</button>
+    </div>
+    <div class="version-badge">v2.0</div>
+    <div class="about-text">
+      <p>Character aptitudes consolidated from the Umamusume Wiki trainee tables across all Global costumes. Latest database update: July 20, 2026 (Copano Rickey).</p>
+      <p>Race calendar sourced from a 152-race G1–G3 dataset. Out-of-Bond holds custom (non-race) trophies, which have no fixed date.</p>
+      <p>Calendar View is an optional toggle. Your list is stored privately in this browser — use Export/Import to move it between sessions or devices.</p>
+      <p>2026, Mujairkitten. Made with Claude Sonnet 5. Not affiliated with Cygames. Source code is licensed under GPL-3. Uma icons are subject to Cygames, used fairly according to <a href="https://umamusume.com/fan-createdguide">Cygames' Fan Content Guide.</a></p>
+    </div>
+  </div>
 </div>
 
 <div id="tooltip"></div>

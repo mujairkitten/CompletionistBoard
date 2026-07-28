@@ -315,9 +315,9 @@ let state = {
   myList: [],
   settings: {
     allowCustomTrainees: true,
+    allowRaceSearch: true,
     allowCustomTrophies: true,
     calendarViewMode: false,
-    inlineCalendar: false,
     lightMode: false,
     activeTraineeId: null
   }
@@ -341,9 +341,13 @@ async function loadState() {
     state.settings = { allowCustomTrainees: true, allowCustomTrophies: true };
   }
   if (state.settings.calendarViewMode === undefined) state.settings.calendarViewMode = false;
-  if (state.settings.inlineCalendar === undefined) state.settings.inlineCalendar = false;
   if (state.settings.lightMode === undefined) state.settings.lightMode = false;
   if (state.settings.activeTraineeId === undefined) state.settings.activeTraineeId = null;
+  if (state.settings.allowRaceSearch === undefined) state.settings.allowRaceSearch = true;
+  // Custom trophies can't meaningfully be off when race search itself is off —
+  // with no search, every entry is inherently a custom one.
+  if (!state.settings.allowRaceSearch) state.settings.allowCustomTrophies = true;
+  delete state.settings.inlineCalendar;
 }
 
 async function saveState() {
@@ -441,15 +445,18 @@ function iconHtml(name, size) {
     <span class="icon-fallback">${initial}</span>
   </div>`;
 }
+function blankIconHtml(size) {
+  return `<div class="trainee-icon trainee-icon-blank" style="--icon-size:${size}px"></div>`;
+}
 function raceDateLabel(r) {
   const yearLabel = r.year.replace(/,\s*/g, '/');
   return `${yearLabel} ${r.turn} ${r.month}`;
 }
 
 function calGradeColor(grade) {
-  if (grade === 'G1') return 'var(--s)';
-  if (grade === 'G2') return 'var(--accent2)';
-  return 'var(--accent)'; // G3
+  if (grade === 'G1') return 'var(--g1)';
+  if (grade === 'G2') return 'var(--g2)';
+  return 'var(--g3)'; // G3
 }
 function calRaceRowHtml(r, opts) {
   const draggable = !!opts.draggable;
@@ -577,7 +584,7 @@ function wireCalPage(root, t, onChange) {
 function renderDatabase() {
   const grid = document.getElementById('db-grid');
   const filter = document.getElementById('db-search').value.trim().toLowerCase();
-  const list = DATABASE.filter(d => d.name.toLowerCase().includes(filter));
+  const list = sortRowsByMode(DATABASE.filter(d => d.name.toLowerCase().includes(filter)), dbSort);
   document.getElementById('db-count').textContent = `${list.length} / ${DATABASE.length}`;
   document.getElementById('db-gate').textContent = DATABASE.length;
 
@@ -659,16 +666,18 @@ function renderMyList() {
           hideSuggestBox(suggestBox);
         }
       });
-      addTInput.addEventListener('input', () => {
-        renderRaceSuggestions(t, addTInput.value, suggestBox, addTInput);
-      });
-      addTInput.addEventListener('focus', () => {
-        renderRaceSuggestions(t, addTInput.value, suggestBox, addTInput);
-      });
-      addTInput.addEventListener('blur', () => {
-        // Delay so a click on a suggestion registers before the box hides.
-        setTimeout(() => hideSuggestBox(suggestBox), 150);
-      });
+      if (state.settings.allowRaceSearch) {
+        addTInput.addEventListener('input', () => {
+          renderRaceSuggestions(t, addTInput.value, suggestBox, addTInput);
+        });
+        addTInput.addEventListener('focus', () => {
+          renderRaceSuggestions(t, addTInput.value, suggestBox, addTInput);
+        });
+        addTInput.addEventListener('blur', () => {
+          // Delay so a click on a suggestion registers before the box hides.
+          setTimeout(() => hideSuggestBox(suggestBox), 150);
+        });
+      }
     }
 
     t.trophies.forEach(tr => {
@@ -678,22 +687,20 @@ function renderMyList() {
       if (rm) rm.addEventListener('click', () => removeTrophy(t.id, tr.id));
     });
 
-    if (state.settings.inlineCalendar) {
-      const calBtn = document.getElementById(`calbtn-${t.id}`);
-      if (calBtn) calBtn.addEventListener('click', () => {
-        if (openInlineCals.has(t.id)) openInlineCals.delete(t.id); else openInlineCals.add(t.id);
+    const calBtn = document.getElementById(`calbtn-${t.id}`);
+    if (calBtn) calBtn.addEventListener('click', () => {
+      if (openInlineCals.has(t.id)) openInlineCals.delete(t.id); else openInlineCals.add(t.id);
+      renderMyList();
+    });
+    const tabsBox = document.getElementById(`caltabs-${t.id}`);
+    if (tabsBox) tabsBox.querySelectorAll('.cal-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        inlineCalTab[t.id] = btn.dataset.tab;
         renderMyList();
       });
-      const tabsBox = document.getElementById(`caltabs-${t.id}`);
-      if (tabsBox) tabsBox.querySelectorAll('.cal-tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          inlineCalTab[t.id] = btn.dataset.tab;
-          renderMyList();
-        });
-      });
-      const pageBox = document.getElementById(`calpage-${t.id}`);
-      if (pageBox) wireCalPage(pageBox, t, renderMyList);
-    }
+    });
+    const pageBox = document.getElementById(`calpage-${t.id}`);
+    if (pageBox) wireCalPage(pageBox, t, renderMyList);
   });
 }
 
@@ -730,7 +737,7 @@ function renderRaceSuggestions(trainee, query, box, inputEl) {
       const distTier = GRADE_INFO[distGrade].tier;
       return `
       <div class="race-suggest-item" data-race="${escapeHtml(r.name)}">
-        <span class="race-grade-tag">${r.grade}</span>
+        <span class="race-grade-tag" style="background:${calGradeColor(r.grade)}">${r.grade}</span>
         <span class="race-info">
           <span class="race-name">${escapeHtml(r.name)}</span>
           <span class="race-date">${escapeHtml(raceDateLabel(r))}</span>
@@ -760,6 +767,10 @@ function renderRaceSuggestions(trainee, query, box, inputEl) {
 function addTrophyFromInput(tid, rawName) {
   const name = (rawName || "").trim();
   if (!name) return;
+  if (!state.settings.allowRaceSearch) {
+    addTrophy(tid, name, null);
+    return;
+  }
   const race = findRaceByExactName(name);
   if (!race && !state.settings.allowCustomTrophies) return;
   addTrophy(tid, name, race ? raceMeta(race) : null);
@@ -786,7 +797,7 @@ function myCardHtml(t) {
         const dateHtml = tr.year ? `<span class="trophy-date">${escapeHtml(raceDateLabel(tr))}</span>` : "";
         metaHtml = `
           ${dateHtml}
-          <span class="mini-tag" style="background:var(--panel-2);color:var(--ink-dim)">${tr.grade || ""}</span>
+          <span class="mini-tag" style="background:${calGradeColor(tr.grade)};color:#12141a">${tr.grade || ""}</span>
           <span class="mini-tag" style="background:var(--${GRADE_INFO[trackGrade].tier})" title="${tr.track} aptitude: ${trackGrade}">${tr.track}</span>
           <span class="mini-tag" style="background:var(--${GRADE_INFO[distGrade].tier})" title="${tr.distance} aptitude: ${distGrade}">${tr.distance}</span>
         `;
@@ -801,16 +812,21 @@ function myCardHtml(t) {
     }).join("")
     : `<div style="font-size:12px;color:var(--ink-faint);font-style:italic;">No races logged yet.</div>`;
 
-  const inlineCalHtml = state.settings.inlineCalendar ? `
+  const oobAllowed = !!state.settings.allowCustomTrophies;
+  const inlineTabs = [...CAL_YEAR_GROUPS, ...(oobAllowed ? ["OoB"] : [])];
+  let inlineActiveTab = inlineCalTab[t.id] || "Junior";
+  if (inlineActiveTab === "OoB" && !oobAllowed) inlineActiveTab = "Junior";
+
+  const inlineCalHtml = `
     <div class="inline-cal">
       <button class="inline-cal-toggle" id="calbtn-${t.id}">📅 Calendar <span class="chev">${openInlineCals.has(t.id) ? '▾' : '▸'}</span></button>
       <div class="inline-cal-body ${openInlineCals.has(t.id) ? 'open' : ''}" id="calbody-${t.id}">
         <div class="cal-tabs" id="caltabs-${t.id}">
-          ${[...CAL_YEAR_GROUPS, "OoB"].map(tab => `<button class="cal-tab-btn ${((inlineCalTab[t.id] || "Junior") === tab) ? 'active' : ''}" data-tab="${tab}">${tab === "OoB" ? "Out-of-Bond" : tab}</button>`).join("")}
+          ${inlineTabs.map(tab => `<button class="cal-tab-btn ${inlineActiveTab === tab ? 'active' : ''}" data-tab="${tab}">${tab === "OoB" ? "Out-of-Bond" : tab}</button>`).join("")}
         </div>
-        <div class="cal-page" id="calpage-${t.id}">${calPageHtml(t, inlineCalTab[t.id] || "Junior")}</div>
+        <div class="cal-page" id="calpage-${t.id}">${calPageHtml(t, inlineActiveTab)}</div>
       </div>
-    </div>` : "";
+    </div>`;
 
   return `
   <div class="mycard">
@@ -829,9 +845,9 @@ function myCardHtml(t) {
       </div>
       <div class="trophy-list">${trophyHtml}</div>
       <div class="add-trophy">
-        <input type="text" id="addt-input-${t.id}" placeholder="${state.settings.allowCustomTrophies ? 'Search races (G1–G3) or type a custom trophy' : 'Search races (G1–G3)'}" autocomplete="off">
+        <input type="text" id="addt-input-${t.id}" placeholder="${!state.settings.allowRaceSearch ? 'Add a custom trophy' : (state.settings.allowCustomTrophies ? 'Search races (G1–G3) or type a custom trophy' : 'Search races (G1–G3)')}" autocomplete="off">
         <button class="btn small" id="addt-btn-${t.id}">+ Add</button>
-        <div class="race-suggest" id="addt-suggest-${t.id}"></div>
+        ${state.settings.allowRaceSearch ? `<div class="race-suggest" id="addt-suggest-${t.id}"></div>` : ""}
       </div>
     </div>
     ${inlineCalHtml}
@@ -911,20 +927,24 @@ let calViewTab = "Junior";
 let calTraineePanelOpen = false;
 let calTraineeSearch = "";
 let calTraineeSort = "default"; // default | az | za
+let dbSort = "default"; // default | az | za
 
-// Fallback only — the About box normally mirrors the live #standard-view .about-text content
-// (see calSidebarHtml) so edits made there automatically show up in Calendar View too.
-const ABOUT_HTML_LINES = [
-  "Character aptitudes consolidated from the Umamusume Wiki trainee tables across all Global costumes. Latest update: July 20, 2026 (Copano Rickey).",
-  "Race calendar sourced from a 152-race G1–G3 dataset. Out-of-Bond holds custom (non-race) trophies, which have no fixed date.",
-  "Calendar View and Inline calendars are experimental toggles. Your list is stored privately in this browser — use Export/Import to move it between sessions or devices.",
-  "2026, Mujairkitten. Made with Claude Sonnet 5. Not affiliated with Cygames. Source code is licensed under GPL-3. Uma icons are subject to Cygames, used fairly according to <a href=\"https://umamusume.com/fan-createdguide\">Cygames' Fan Content Guide.</a>"
-];
+// Placeholder shown in Calendar View when My List is empty — lets the grid
+// render (greyed out) instead of just showing a wall of text.
+const CAL_EMPTY_TRAINEE = {
+  id: "__empty__",
+  name: "Add Trainee Here...",
+  aptitudes: { turf: "A", dirt: "A", short: "A", mile: "A", medium: "A", long: "A" },
+  trophies: []
+};
 
-function sortTraineeRows(rows) {
-  if (calTraineeSort === "az") return [...rows].sort((a, b) => a.name.localeCompare(b.name));
-  if (calTraineeSort === "za") return [...rows].sort((a, b) => b.name.localeCompare(a.name));
+function sortRowsByMode(rows, mode) {
+  if (mode === "az") return [...rows].sort((a, b) => a.name.localeCompare(b.name));
+  if (mode === "za") return [...rows].sort((a, b) => b.name.localeCompare(a.name));
   return rows;
+}
+function sortTraineeRows(rows) {
+  return sortRowsByMode(rows, calTraineeSort);
 }
 
 function calTraineePanelHtml(activeTrainee) {
@@ -938,6 +958,7 @@ function calTraineePanelHtml(activeTrainee) {
       ${iconHtml(t.name, 28)}
       <span class="cal-trainee-row-name">${escapeHtml(t.name)}</span>
       ${t.id === activeTrainee.id ? '<span class="cal-trainee-current">Current</span>' : ''}
+      <button class="cal-trainee-remove" data-remove="${t.id}" title="Remove from My List" aria-label="Remove ${escapeHtml(t.name)} from My List">&times;</button>
     </div>`).join("") || `<div class="cal-trainee-empty">No matches in My List.</div>`;
 
   const otherHtml = otherRows.map(d => `
@@ -962,20 +983,29 @@ function calTraineePanelHtml(activeTrainee) {
   </div>`;
 }
 
-function calSidebarHtml(activeTrainee) {
+function calSidebarHtml(activeTrainee, isEmpty) {
+  const iconBlock = isEmpty ? blankIconHtml(96) : iconHtml(activeTrainee.name, 96);
   return `
   <div class="cal-sidebar">
     <div class="cal-trainee-box">
-      ${iconHtml(activeTrainee.name, 96)}
+      ${iconBlock}
       <button class="cal-trainee-name-btn" id="cal-trainee-btn">
         <span class="cal-trainee-name">${escapeHtml(activeTrainee.name)}</span>
         <span class="cal-trainee-arrow">▾</span>
       </button>
       ${calTraineePanelOpen ? calTraineePanelHtml(activeTrainee) : ''}
     </div>
+    ${!isEmpty ? `
     <div class="cal-tool-box">
       <div class="cal-tool-box-title">Aptitude chips</div>
       ${aptGroupsHtml(activeTrainee.aptitudes)}
+    </div>` : ''}
+    <div class="cal-tool-box">
+      <div class="cal-tool-box-title">Find a race</div>
+      <div class="cal-locate-wrap">
+        <input type="text" class="search" id="cal-locate-input" placeholder="Search races…" autocomplete="off">
+        <div class="race-suggest" id="cal-locate-suggest"></div>
+      </div>
     </div>
     <div class="cal-tool-box">
       <div class="cal-tool-box-title">More tools</div>
@@ -986,17 +1016,65 @@ function calSidebarHtml(activeTrainee) {
         <button class="btn small ghost" id="cal-exit-btn">Exit Calendar View</button>
       </div>
     </div>
-    <div class="cal-tool-box">
-      <div class="cal-tool-box-title">About</div>
-      <div class="about-text">${getAboutHtml()}</div>
-    </div>
   </div>`;
 }
 
-function getAboutHtml() {
-  const live = document.querySelector('#standard-view .about-text');
-  if (live && live.innerHTML.trim()) return live.innerHTML;
-  return ABOUT_HTML_LINES.map(l => `<p>${l}</p>`).join("");
+function wireCalLocate(host) {
+  const input = document.getElementById('cal-locate-input');
+  const box = document.getElementById('cal-locate-suggest');
+  if (!input || !box) return;
+
+  const showResults = () => {
+    const q = input.value.trim().toLowerCase();
+    if (!q) { box.classList.remove('show'); return; }
+    const matches = RACES.filter(r => r.name.toLowerCase().includes(q)).slice(0, 20);
+    box.innerHTML = matches.length === 0
+      ? `<div class="race-suggest-empty">No matching race.</div>`
+      : matches.map(r => `
+        <div class="race-suggest-item" data-race="${escapeHtml(r.name)}">
+          <span class="race-grade-tag" style="background:${calGradeColor(r.grade)}">${r.grade}</span>
+          <span class="race-info">
+            <span class="race-name">${escapeHtml(r.name)}</span>
+            <span class="race-date">${escapeHtml(raceDateLabel(r))}</span>
+          </span>
+          <span class="race-meta">
+            <span class="mini-tag" style="background:var(--panel-2);color:var(--ink-dim)">${r.track} · ${r.distance}</span>
+          </span>
+        </div>`).join("");
+    box.classList.add('show');
+  };
+
+  input.addEventListener('input', showResults);
+  input.addEventListener('focus', showResults);
+  input.addEventListener('blur', () => setTimeout(() => box.classList.remove('show'), 150));
+  box.addEventListener('mousedown', (e) => {
+    const item = e.target.closest('.race-suggest-item');
+    if (!item) return;
+    e.preventDefault();
+    locateRaceInCalendar(item.dataset.race);
+    input.value = "";
+    box.classList.remove('show');
+  });
+}
+
+function locateRaceInCalendar(name) {
+  const race = findRaceByExactName(name);
+  if (!race) return;
+  if (!raceAppliesToYear(race, calViewTab)) {
+    const groups = race.year.split(",").map(s => s.trim());
+    calViewTab = groups[0];
+  }
+  const targetYear = calViewTab;
+  renderCalendarView();
+  requestAnimationFrame(() => {
+    const slotKey = calSlotKey(race.month, race.turn);
+    const cell = document.querySelector(`.cal-cell[data-slot="${CSS.escape(slotKey)}"][data-year="${targetYear}"]`);
+    if (cell) {
+      cell.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      cell.classList.add('cal-cell-flash');
+      setTimeout(() => cell.classList.remove('cal-cell-flash'), 1600);
+    }
+  });
 }
 
 function wireCalTraineePanel(host, activeTrainee) {
@@ -1050,30 +1128,42 @@ function wireCalTraineePanel(host, activeTrainee) {
       renderCalendarView();
     });
   });
+
+  panel.querySelectorAll('[data-remove]').forEach(b => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeFromMyList(b.dataset.remove);
+      renderCalendarView();
+    });
+  });
 }
 
 function renderCalendarView() {
   const host = document.getElementById('calendar-view');
   if (!host) return;
 
-  if (state.myList.length === 0) {
-    host.innerHTML = `<div class="empty-note" style="margin:30px 0;">Add at least one trainee to My List first — Calendar View needs someone to track.</div>`;
-    return;
+  const isEmpty = state.myList.length === 0;
+  let activeTrainee;
+  if (isEmpty) {
+    activeTrainee = CAL_EMPTY_TRAINEE;
+  } else {
+    activeTrainee = state.myList.find(t => t.id === state.settings.activeTraineeId);
+    if (!activeTrainee) {
+      activeTrainee = state.myList[0];
+      state.settings.activeTraineeId = activeTrainee.id;
+      saveState();
+    }
   }
 
-  let activeTrainee = state.myList.find(t => t.id === state.settings.activeTraineeId);
-  if (!activeTrainee) {
-    activeTrainee = state.myList[0];
-    state.settings.activeTraineeId = activeTrainee.id;
-    saveState();
-  }
+  if (calViewTab === "OoB" && !state.settings.allowCustomTrophies) calViewTab = "Junior";
+  const mainTabs = [...CAL_YEAR_GROUPS, ...(state.settings.allowCustomTrophies ? ["OoB"] : [])];
 
   host.innerHTML = `
     <div class="calendar-layout">
-      ${calSidebarHtml(activeTrainee)}
-      <div class="cal-main">
+      ${calSidebarHtml(activeTrainee, isEmpty)}
+      <div class="cal-main${isEmpty ? ' cal-disabled' : ''}">
         <div class="cal-tabs cal-tabs-main" id="cal-main-tabs">
-          ${[...CAL_YEAR_GROUPS, "OoB"].map(tab => `<button class="cal-tab-btn ${calViewTab === tab ? 'active' : ''}" data-tab="${tab}">${tab === "OoB" ? "Out-of-Bond" : tab}</button>`).join("")}
+          ${mainTabs.map(tab => `<button class="cal-tab-btn ${calViewTab === tab ? 'active' : ''}" data-tab="${tab}">${tab === "OoB" ? "Out-of-Bond" : tab}</button>`).join("")}
         </div>
         <div class="cal-page" id="cal-main-page">${calPageHtml(activeTrainee, calViewTab)}</div>
       </div>
@@ -1081,6 +1171,7 @@ function renderCalendarView() {
 
   wireChips(host);
   wireCalTraineePanel(host, activeTrainee);
+  wireCalLocate(host);
 
   document.getElementById('cal-main-tabs').querySelectorAll('.cal-tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1126,27 +1217,31 @@ function renderMainView() {
 function applySettingsUI() {
   const lightToggle = document.getElementById('toggle-light-mode');
   const trainToggle = document.getElementById('toggle-custom-trainee');
+  const raceSearchToggle = document.getElementById('toggle-race-search');
   const trophyToggle = document.getElementById('toggle-custom-trophy');
   const calViewToggle = document.getElementById('toggle-calendar-view');
-  const inlineCalToggle = document.getElementById('toggle-inline-calendar');
   const trainRow = document.getElementById('custom-trainee-row');
+
+  // Custom trophies can't be turned off when race search itself is off — with
+  // no search, every trophy typed is inherently a custom one.
+  if (!state.settings.allowRaceSearch) state.settings.allowCustomTrophies = true;
 
   document.body.classList.toggle('light', !!state.settings.lightMode);
 
   if (lightToggle) lightToggle.checked = !!state.settings.lightMode;
   if (trainToggle) trainToggle.checked = !!state.settings.allowCustomTrainees;
-  if (trophyToggle) trophyToggle.checked = !!state.settings.allowCustomTrophies;
+  if (raceSearchToggle) raceSearchToggle.checked = !!state.settings.allowRaceSearch;
+  if (trophyToggle) {
+    trophyToggle.checked = !!state.settings.allowCustomTrophies;
+    trophyToggle.disabled = !state.settings.allowRaceSearch;
+  }
+  const trophyRow = document.getElementById('toggle-custom-trophy-row');
+  if (trophyRow) trophyRow.classList.toggle('settings-row-disabled', !state.settings.allowRaceSearch);
   if (calViewToggle) calViewToggle.checked = !!state.settings.calendarViewMode;
-  if (inlineCalToggle) inlineCalToggle.checked = !!state.settings.inlineCalendar;
 
   if (trainRow) {
     trainRow.style.display = state.settings.allowCustomTrainees ? '' : 'none';
   }
-  document.querySelectorAll('[id^="addt-input-"]').forEach(inp => {
-    inp.placeholder = state.settings.allowCustomTrophies
-      ? "Search races (G1–G3) or type a custom trophy"
-      : "Search races (G1–G3)";
-  });
 }
 
 function closeSettingsPanel() {
@@ -1168,6 +1263,32 @@ async function init() {
     e.target.value = "";
   });
 
+  document.querySelectorAll('#db-sort .sort-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      dbSort = btn.dataset.sort;
+      document.querySelectorAll('#db-sort .sort-btn').forEach(b => b.classList.toggle('active', b === btn));
+      renderDatabase();
+    });
+  });
+
+  const aboutBtn = document.getElementById('about-btn');
+  const aboutOverlay = document.getElementById('about-overlay');
+  const aboutClose = document.getElementById('about-close');
+  if (aboutBtn && aboutOverlay) {
+    aboutBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeSettingsPanel();
+      aboutOverlay.classList.add('show');
+    });
+    aboutOverlay.addEventListener('click', (e) => {
+      if (e.target === aboutOverlay) aboutOverlay.classList.remove('show');
+    });
+    if (aboutClose) aboutClose.addEventListener('click', () => aboutOverlay.classList.remove('show'));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') aboutOverlay.classList.remove('show');
+    });
+  }
+
   const settingsBtn = document.getElementById('settings-btn');
   const settingsPanel = document.getElementById('settings-panel');
   if (settingsBtn && settingsPanel) {
@@ -1180,9 +1301,9 @@ async function init() {
 
   const lightToggle = document.getElementById('toggle-light-mode');
   const trainToggle = document.getElementById('toggle-custom-trainee');
+  const raceSearchToggle = document.getElementById('toggle-race-search');
   const trophyToggle = document.getElementById('toggle-custom-trophy');
   const calViewToggle = document.getElementById('toggle-calendar-view');
-  const inlineCalToggle = document.getElementById('toggle-inline-calendar');
 
   if (lightToggle) lightToggle.addEventListener('change', () => {
     state.settings.lightMode = lightToggle.checked;
@@ -1192,16 +1313,17 @@ async function init() {
     state.settings.allowCustomTrainees = trainToggle.checked;
     saveState(); applySettingsUI();
   });
+  if (raceSearchToggle) raceSearchToggle.addEventListener('change', () => {
+    state.settings.allowRaceSearch = raceSearchToggle.checked;
+    saveState(); applySettingsUI(); renderMainView();
+  });
   if (trophyToggle) trophyToggle.addEventListener('change', () => {
+    if (!state.settings.allowRaceSearch) return; // locked on while race search is off
     state.settings.allowCustomTrophies = trophyToggle.checked;
-    saveState(); applySettingsUI();
+    saveState(); applySettingsUI(); renderMainView();
   });
   if (calViewToggle) calViewToggle.addEventListener('change', () => {
     state.settings.calendarViewMode = calViewToggle.checked;
-    saveState(); applySettingsUI(); renderMainView();
-  });
-  if (inlineCalToggle) inlineCalToggle.addEventListener('change', () => {
-    state.settings.inlineCalendar = inlineCalToggle.checked;
     saveState(); applySettingsUI(); renderMainView();
   });
 
