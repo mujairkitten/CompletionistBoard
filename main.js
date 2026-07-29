@@ -1,0 +1,127 @@
+// App bootstrap: settings panel, About modal, and the standard-view /
+// Calendar-View dispatcher that both other modules call into.
+
+import { state, loadState, saveState } from './core.js';
+import { renderDatabase, renderMyList, addCustom, wireStandardViewControls } from './standard-view.js';
+import { renderCalendarView, closeCalTraineePanel } from './calendar.js';
+
+// Shows either the standard Database + My List layout, or the optional Calendar View.
+export function renderMainView() {
+  const standard = document.getElementById('standard-view');
+  const calView = document.getElementById('calendar-view');
+  if (state.settings.calendarViewMode) {
+    if (standard) standard.style.display = 'none';
+    if (calView) calView.style.display = '';
+    renderCalendarView();
+  } else {
+    if (standard) standard.style.display = '';
+    if (calView) calView.style.display = 'none';
+    renderDatabase();
+    renderMyList();
+  }
+}
+
+export function applySettingsUI() {
+  const lightToggle = document.getElementById('toggle-light-mode');
+  const trainToggle = document.getElementById('toggle-custom-trainee');
+  const raceSearchToggle = document.getElementById('toggle-race-search');
+  const trophyToggle = document.getElementById('toggle-custom-trophy');
+  const calViewToggle = document.getElementById('toggle-calendar-view');
+  const trainRow = document.getElementById('custom-trainee-row');
+
+  // Custom trophies can't be turned off when race search itself is off — with
+  // no search, every trophy typed is inherently a custom one.
+  if (!state.settings.allowRaceSearch) state.settings.allowCustomTrophies = true;
+
+  document.body.classList.toggle('light', !!state.settings.lightMode);
+
+  if (lightToggle) lightToggle.checked = !!state.settings.lightMode;
+  if (trainToggle) trainToggle.checked = !!state.settings.allowCustomTrainees;
+  if (raceSearchToggle) raceSearchToggle.checked = !!state.settings.allowRaceSearch;
+  if (trophyToggle) {
+    trophyToggle.checked = !!state.settings.allowCustomTrophies;
+    trophyToggle.disabled = !state.settings.allowRaceSearch;
+  }
+  const trophyRow = document.getElementById('toggle-custom-trophy-row');
+  if (trophyRow) trophyRow.classList.toggle('settings-row-disabled', !state.settings.allowRaceSearch);
+  if (calViewToggle) calViewToggle.checked = !!state.settings.calendarViewMode;
+
+  if (trainRow) {
+    trainRow.style.display = state.settings.allowCustomTrainees ? '' : 'none';
+  }
+}
+
+function closeSettingsPanel() {
+  const panel = document.getElementById('settings-panel');
+  if (panel) panel.classList.remove('show');
+}
+
+async function init() {
+  await loadState();
+  applySettingsUI();
+  renderMainView();
+
+  wireStandardViewControls();
+
+  const aboutBtn = document.getElementById('about-btn');
+  const aboutOverlay = document.getElementById('about-overlay');
+  const aboutClose = document.getElementById('about-close');
+  if (aboutBtn && aboutOverlay) {
+    aboutBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeSettingsPanel();
+      aboutOverlay.classList.add('show');
+    });
+    aboutOverlay.addEventListener('click', (e) => {
+      if (e.target === aboutOverlay) aboutOverlay.classList.remove('show');
+    });
+    if (aboutClose) aboutClose.addEventListener('click', () => aboutOverlay.classList.remove('show'));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') aboutOverlay.classList.remove('show');
+    });
+  }
+
+  const settingsBtn = document.getElementById('settings-btn');
+  const settingsPanel = document.getElementById('settings-panel');
+  if (settingsBtn && settingsPanel) {
+    settingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      settingsPanel.classList.toggle('show');
+    });
+    settingsPanel.addEventListener('click', e => e.stopPropagation());
+  }
+
+  const lightToggle = document.getElementById('toggle-light-mode');
+  const trainToggle = document.getElementById('toggle-custom-trainee');
+  const raceSearchToggle = document.getElementById('toggle-race-search');
+  const trophyToggle = document.getElementById('toggle-custom-trophy');
+  const calViewToggle = document.getElementById('toggle-calendar-view');
+
+  if (lightToggle) lightToggle.addEventListener('change', () => {
+    state.settings.lightMode = lightToggle.checked;
+    saveState(); applySettingsUI();
+  });
+  if (trainToggle) trainToggle.addEventListener('change', () => {
+    state.settings.allowCustomTrainees = trainToggle.checked;
+    saveState(); applySettingsUI();
+  });
+  if (raceSearchToggle) raceSearchToggle.addEventListener('change', () => {
+    state.settings.allowRaceSearch = raceSearchToggle.checked;
+    saveState(); applySettingsUI(); renderMainView();
+  });
+  if (trophyToggle) trophyToggle.addEventListener('change', () => {
+    if (!state.settings.allowRaceSearch) return; // locked on while race search is off
+    state.settings.allowCustomTrophies = trophyToggle.checked;
+    saveState(); applySettingsUI(); renderMainView();
+  });
+  if (calViewToggle) calViewToggle.addEventListener('change', () => {
+    state.settings.calendarViewMode = calViewToggle.checked;
+    saveState(); applySettingsUI(); renderMainView();
+  });
+
+  document.addEventListener('click', () => {
+    closeSettingsPanel();
+    closeCalTraineePanel();
+  });
+}
+init();
