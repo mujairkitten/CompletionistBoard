@@ -11,6 +11,19 @@
   --accent: #8b7bff;
   --accent-dim: #6f5fd6;
   --accent2: #4fd1ff;
+  /* Glassmorphism tuning (dark mode only). Two tiers: "glass" surfaces get a
+     real backdrop-filter blur and are reserved for low-count/singleton
+     elements (topbar, My List cards, Calendar View panels, modal). "Faux"
+     surfaces are tinted/translucent but have NO blur — used for anything
+     that can appear in large numbers (db-grid, up to 62 cards) or that
+     stacks visually on top of an already-blurred surface (dropdowns,
+     tooltips), so we never compound blur-on-blur. */
+  --glass-bg: rgba(23, 26, 34, .58);
+  --glass-bg-soft: rgba(23, 26, 34, .5);
+  --glass-border: rgba(255, 255, 255, .09);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, .06);
+  --faux-glass-bg: rgba(23, 26, 34, .74);
+  --faux-glass-card-bg: rgba(23, 26, 34, .74);
   --s: #ffb84d;
   --a: #4ee38a;
   --b: #9fdb5c;
@@ -38,6 +51,14 @@ body.light {
   --accent: #6c5ce7;
   --accent-dim: #5a4bd1;
   --accent2: #2e86de;
+  /* Glass theme is dark-mode only — fall these back to the original
+     light-mode solid colors so nothing visually changes here. */
+  --glass-bg: var(--bg-alt);
+  --glass-bg-soft: var(--panel);
+  --glass-border: var(--line);
+  --glass-highlight: none;
+  --faux-glass-bg: var(--panel-2);
+  --faux-glass-card-bg: var(--panel);
 }
 
 * {
@@ -63,13 +84,19 @@ body {
 }
 
 .topbar {
-  background: var(--bg-alt);
-  border-bottom: 1px solid var(--line);
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--glass-border);
   padding: 16px 0;
   margin-bottom: 22px;
   position: sticky;
   top: 0;
   z-index: 90;
+  will-change: transform;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .topbar { background: var(--bg-alt); }
 }
 
 .topbar-inner {
@@ -144,8 +171,8 @@ body {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
+  background: var(--faux-glass-bg);
+  border: 1px solid var(--glass-border);
   border-radius: 16px;
   padding: 12px 14px;
   width: 230px;
@@ -337,20 +364,21 @@ section.block {
 }
 
 .db-card {
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: var(--faux-glass-card-bg);
+  border: 1px solid var(--glass-border);
   border-radius: 14px;
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 9px;
   position: relative;
+  box-shadow: var(--glass-highlight);
   transition: box-shadow .15s ease, border-color .15s ease;
 }
 
 .db-card:hover {
   border-color: var(--accent-dim);
-  box-shadow: 0 0 18px rgba(139, 123, 255, .16);
+  box-shadow: var(--glass-highlight), 0 0 18px rgba(139, 123, 255, .16);
 }
 
 .db-card-top {
@@ -453,16 +481,23 @@ body.light .chip:hover {
 }
 
 .mycard {
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: var(--glass-bg-soft);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--glass-border);
   border-radius: 14px;
   padding: 16px 18px;
+  box-shadow: var(--glass-highlight);
+  will-change: transform;
   transition: box-shadow .15s ease, border-color .15s ease;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .mycard { background: var(--panel); }
 }
 
 .mycard:hover {
   border-color: var(--accent-dim);
-  box-shadow: 0 0 18px rgba(139, 123, 255, .14);
+  box-shadow: var(--glass-highlight), 0 0 18px rgba(139, 123, 255, .14);
 }
 
 .mycard-head {
@@ -615,8 +650,8 @@ body.light .chip:hover {
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
+  background: var(--faux-glass-bg);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
   max-height: 240px;
   overflow-y: auto;
@@ -745,8 +780,8 @@ body.light .chip:hover {
   position: fixed;
   z-index: 1000;
   pointer-events: none;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
+  background: var(--faux-glass-bg);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
   padding: 10px 12px;
   width: 220px;
@@ -868,8 +903,10 @@ footer {
 }
 
 .cal-trainee-box {
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: var(--glass-bg-soft);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--glass-border);
   border-radius: 14px;
   padding: 20px 16px;
   text-align: center;
@@ -877,6 +914,10 @@ footer {
   flex-direction: column;
   align-items: center;
   gap: 8px;
+  box-shadow: var(--glass-highlight);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .cal-trainee-box { background: var(--panel); }
 }
 
 .cal-trainee-name {
@@ -886,10 +927,16 @@ footer {
 }
 
 .cal-tool-box {
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: var(--glass-bg-soft);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--glass-border);
   border-radius: 14px;
   padding: 14px 16px;
+  box-shadow: var(--glass-highlight);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .cal-tool-box { background: var(--panel); }
 }
 
 .cal-tool-box-title {
@@ -967,10 +1014,10 @@ footer {
 }
 
 .cal-cell {
-  border: 1px solid var(--line);
+  border: 1px solid var(--glass-border);
   border-radius: 10px;
   padding: 8px;
-  background: var(--panel);
+  background: var(--faux-glass-card-bg);
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -1108,8 +1155,8 @@ footer {
   left: 0;
   right: 0;
   margin-top: 10px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
+  background: var(--faux-glass-bg);
+  border: 1px solid var(--glass-border);
   border-radius: 14px;
   padding: 12px;
   z-index: 96;
@@ -1234,15 +1281,21 @@ footer {
 }
 
 .modal-box {
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
   border-radius: 16px;
   padding: 20px 22px;
   max-width: 520px;
   width: 100%;
   max-height: 80vh;
   overflow-y: auto;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, .5), 0 0 20px rgba(139, 123, 255, .12);
+  box-shadow: var(--glass-highlight), 0 20px 50px rgba(0, 0, 0, .5), 0 0 20px rgba(139, 123, 255, .12);
+  contain: paint;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .modal-box { background: var(--panel); }
 }
 
 .modal-head {
