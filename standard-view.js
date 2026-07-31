@@ -117,8 +117,12 @@ export function renderMyList() {
 
     const calBtn = document.getElementById(`calbtn-${t.id}`);
     if (calBtn) calBtn.addEventListener('click', () => {
-      if (openInlineCals.has(t.id)) openInlineCals.delete(t.id); else openInlineCals.add(t.id);
-      renderMyList();
+      const willOpen = !openInlineCals.has(t.id);
+      if (willOpen) openInlineCals.add(t.id); else openInlineCals.delete(t.id);
+      const calBody = document.getElementById(`calbody-${t.id}`);
+      const calChev = calBtn.querySelector('.cal-trainee-arrow');
+      if (calBody) calBody.classList.toggle('open', willOpen);
+      if (calChev) calChev.classList.toggle('open', willOpen);
     });
     const tabsBox = document.getElementById(`caltabs-${t.id}`);
     if (tabsBox) tabsBox.querySelectorAll('.cal-tab-btn').forEach(btn => {
@@ -247,7 +251,14 @@ function myCardHtml(t) {
 
   const inlineCalHtml = `
     <div class="inline-cal">
-      <button class="inline-cal-toggle" id="calbtn-${t.id}">📅 Calendar <span class="chev">${openInlineCals.has(t.id) ? '▾' : '▸'}</span></button>
+      <button class="inline-cal-toggle" id="calbtn-${t.id}">
+        📅 Calendar
+        <span class="cal-trainee-arrow${openInlineCals.has(t.id) ? ' open' : ''}">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+      </button>
       <div class="inline-cal-body ${openInlineCals.has(t.id) ? 'open' : ''}" id="calbody-${t.id}">
         <div class="cal-tabs" id="caltabs-${t.id}">
           ${inlineTabs.map(tab => `<button class="cal-tab-btn ${inlineActiveTab === tab ? 'active' : ''}" data-tab="${tab}">${tab === "OoB" ? "Out-of-Bond" : tab}</button>`).join("")}

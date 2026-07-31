@@ -8,9 +8,11 @@
   --ink: #eef0f5;
   --ink-dim: #9aa3b8;
   --ink-faint: #5f6779;
-  --accent: #8b7bff;
-  --accent-dim: #6f5fd6;
-  --accent2: #4fd1ff;
+  --accent: #22b573;
+  --accent-dim: #1a8f5a;
+  --accent2: #2bcfa8;
+  --accent-rgb: 34, 181, 115;
+  --accent2-rgb: 43, 207, 168;
   /* Glassmorphism tuning (dark mode only). Two tiers: "glass" surfaces get a
      real backdrop-filter blur and are reserved for low-count/singleton
      elements (topbar, My List cards, Calendar View panels, modal). "Faux"
@@ -48,9 +50,11 @@ body.light {
   --ink: #1c2029;
   --ink-dim: #5b6474;
   --ink-faint: #8b93a3;
-  --accent: #6c5ce7;
-  --accent-dim: #5a4bd1;
-  --accent2: #2e86de;
+  --accent: #187a4d;
+  --accent-dim: #125f3b;
+  --accent2: #187560;
+  --accent-rgb: 24, 122, 77;
+  --accent2-rgb: 24, 117, 96;
   /* Glass theme is dark-mode only — fall these back to the original
      light-mode solid colors so nothing visually changes here. */
   --glass-bg: var(--bg-alt);
@@ -61,6 +65,24 @@ body.light {
   --faux-glass-card-bg: var(--panel);
 }
 
+/* Color theme: Dirt (Amber & Bronze). Independent of light/dark mode — only
+   swaps the accent trio, never bg/panel/ink, so it composes cleanly with
+   either mode. */
+body.dirt {
+  --accent: #e0a640;
+  --accent-dim: #b9822e;
+  --accent2: #c97b4a;
+  --accent-rgb: 224, 166, 64;
+  --accent2-rgb: 201, 123, 74;
+}
+body.light.dirt {
+  --accent: #9c6a0a;
+  --accent-dim: #7f560a;
+  --accent2: #a85a2e;
+  --accent-rgb: 156, 106, 10;
+  --accent2-rgb: 168, 90, 46;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -69,8 +91,8 @@ body {
   margin: 0;
   overflow-x: hidden;
   background:
-    radial-gradient(ellipse 900px 420px at 15% -10%, rgba(139, 123, 255, .14), transparent 60%),
-    radial-gradient(ellipse 700px 380px at 100% 0%, rgba(79, 209, 255, .10), transparent 55%),
+    radial-gradient(ellipse 900px 420px at 15% -10%, rgba(var(--accent-rgb), .14), transparent 60%),
+    radial-gradient(ellipse 700px 380px at 100% 0%, rgba(var(--accent2-rgb), .10), transparent 55%),
     var(--bg);
   color: var(--ink);
   padding-bottom: 70px;
@@ -144,7 +166,7 @@ body {
 .btn:hover {
   border-color: var(--accent-dim);
   color: var(--accent2);
-  box-shadow: 0 0 12px rgba(139, 123, 255, .35);
+  box-shadow: 0 0 12px rgba(var(--accent-rgb), .35);
 }
 
 .btn.small {
@@ -177,7 +199,7 @@ body {
   padding: 12px 14px;
   width: 230px;
   z-index: 95;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, .5), 0 0 18px rgba(139, 123, 255, .16);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .5), 0 0 18px rgba(var(--accent-rgb), .16);
   flex-direction: column;
   gap: 8px;
 }
@@ -265,7 +287,7 @@ body {
 
 .switch input:checked + .switch-slider {
   background: var(--accent);
-  box-shadow: 0 0 10px rgba(139, 123, 255, .5);
+  box-shadow: 0 0 10px rgba(var(--accent-rgb), .5);
 }
 
 .switch input:checked + .switch-slider::before {
@@ -302,7 +324,7 @@ section.block {
   font-size: 12px;
   color: var(--accent2);
   flex-shrink: 0;
-  box-shadow: 0 0 10px rgba(139, 123, 255, .4);
+  box-shadow: 0 0 10px rgba(var(--accent-rgb), .4);
 }
 
 .block-head h2 {
@@ -350,7 +372,7 @@ section.block {
 .search:focus {
   outline: none;
   border-color: var(--accent-dim);
-  box-shadow: 0 0 12px rgba(139, 123, 255, .3);
+  box-shadow: 0 0 12px rgba(var(--accent-rgb), .3);
 }
 
 .search::placeholder {
@@ -378,7 +400,7 @@ section.block {
 
 .db-card:hover {
   border-color: var(--accent-dim);
-  box-shadow: var(--glass-highlight), 0 0 18px rgba(139, 123, 255, .16);
+  box-shadow: var(--glass-highlight), 0 0 18px rgba(var(--accent-rgb), .16);
 }
 
 .db-card-top {
@@ -497,7 +519,7 @@ body.light .chip:hover {
 
 .mycard:hover {
   border-color: var(--accent-dim);
-  box-shadow: var(--glass-highlight), 0 0 18px rgba(139, 123, 255, .14);
+  box-shadow: var(--glass-highlight), 0 0 18px rgba(var(--accent-rgb), .14);
 }
 
 .mycard-head {
@@ -572,7 +594,7 @@ body.light .chip:hover {
 .progress-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--accent), var(--accent2));
-  box-shadow: 0 0 8px rgba(79, 209, 255, .6);
+  box-shadow: 0 0 8px rgba(var(--accent2-rgb), .6);
 }
 
 .progress-pct {
@@ -656,7 +678,7 @@ body.light .chip:hover {
   max-height: 240px;
   overflow-y: auto;
   z-index: 50;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .5), 0 0 16px rgba(139, 123, 255, .12);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .5), 0 0 16px rgba(var(--accent-rgb), .12);
 }
 
 .race-suggest.show {
@@ -789,7 +811,7 @@ body.light .chip:hover {
   font-weight: 500;
   line-height: 1.4;
   color: var(--ink);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, .5), 0 0 18px rgba(139, 123, 255, .18);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, .5), 0 0 18px rgba(var(--accent-rgb), .18);
   opacity: 0;
   transform: translateY(4px);
   transition: opacity .1s ease, transform .1s ease;
@@ -858,10 +880,6 @@ footer {
   color: var(--accent2);
 }
 
-.inline-cal-toggle .chev {
-  font-size: 10px;
-}
-
 .inline-cal-body {
   display: none;
   margin-top: 10px;
@@ -899,7 +917,16 @@ footer {
   gap: 16px;
   position: sticky;
   top: 20px;
-  z-index: 91;
+  z-index: 40;
+}
+
+/* Elevated above the topbar only while the trainee-switcher dropdown is
+   open — keeps the sidebar's baseline z-index modest the rest of the time,
+   so it never permanently buries whatever's open inside the topbar (like
+   the settings panel). Safe because the two popovers are mutually
+   exclusive — only one is ever open at a time. */
+.cal-sidebar.panel-open {
+  z-index: 97;
 }
 
 .cal-trainee-box {
@@ -994,7 +1021,7 @@ footer {
   background: var(--accent);
   color: #12141a;
   border-color: var(--accent);
-  box-shadow: 0 0 12px rgba(139, 123, 255, .4);
+  box-shadow: 0 0 12px rgba(var(--accent-rgb), .4);
 }
 
 .cal-grid-46 {
@@ -1050,7 +1077,7 @@ footer {
 }
 
 .cal-race-row.drag-over {
-  background: rgba(139, 123, 255, .18);
+  background: rgba(var(--accent-rgb), .18);
   box-shadow: inset 0 0 0 1px var(--accent-dim);
 }
 
@@ -1129,6 +1156,15 @@ footer {
   position: relative;
 }
 
+/* backdrop-filter alone creates a stacking context (even without z-index),
+   so cal-trainee-box and cal-tool-box — plain siblings, neither with an
+   explicit z-index — tie at that implicit level and fall back to DOM order,
+   where cal-tool-box (rendered after) wins and buries the dropdown. This
+   explicit z-index breaks that tie only while the dropdown is open. */
+.cal-trainee-box.panel-open {
+  z-index: 10;
+}
+
 .cal-trainee-name-btn {
   background: none;
   border: none;
@@ -1145,8 +1181,42 @@ footer {
 }
 
 .cal-trainee-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
   color: var(--ink-faint);
-  font-size: 12px;
+  transition: transform .25s cubic-bezier(.4, 0, .2, 1), background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.cal-trainee-arrow svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.cal-trainee-name-btn:hover .cal-trainee-arrow,
+.inline-cal-toggle:hover .cal-trainee-arrow {
+  border-color: var(--accent-dim);
+  color: var(--accent2);
+}
+
+.cal-trainee-arrow.open {
+  transform: rotate(180deg);
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #12141a;
+}
+
+.cal-trainee-name-btn:hover .cal-trainee-arrow.open,
+.inline-cal-toggle:hover .cal-trainee-arrow.open {
+  border-color: var(--accent-dim);
+  color: #12141a;
 }
 
 .cal-trainee-panel {
@@ -1160,10 +1230,21 @@ footer {
   border-radius: 14px;
   padding: 12px;
   z-index: 96;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, .5), 0 0 18px rgba(139, 123, 255, .14);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .5), 0 0 18px rgba(var(--accent-rgb), .14);
   width: 300px;
   max-width: 80vw;
   text-align: left;
+  opacity: 0;
+  transform: translateY(-6px) scale(.98);
+  transform-origin: top left;
+  pointer-events: none;
+  transition: opacity .25s cubic-bezier(.4, 0, .2, 1), transform .25s cubic-bezier(.4, 0, .2, 1);
+}
+
+.cal-trainee-panel.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
 }
 
 .cal-trainee-panel .search {
@@ -1229,7 +1310,7 @@ footer {
 }
 
 .cal-trainee-row.active {
-  background: rgba(139, 123, 255, .15);
+  background: rgba(var(--accent-rgb), .15);
 }
 
 .cal-trainee-row-name {
@@ -1291,7 +1372,7 @@ footer {
   width: 100%;
   max-height: 80vh;
   overflow-y: auto;
-  box-shadow: var(--glass-highlight), 0 20px 50px rgba(0, 0, 0, .5), 0 0 20px rgba(139, 123, 255, .12);
+  box-shadow: var(--glass-highlight), 0 20px 50px rgba(0, 0, 0, .5), 0 0 20px rgba(var(--accent-rgb), .12);
   contain: paint;
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -1366,7 +1447,7 @@ footer {
 
 /* Brief, lightweight highlight when a searched race is located in the grid */
 .cal-cell-flash {
-  box-shadow: 0 0 0 2px var(--accent), 0 0 14px 2px rgba(139, 123, 255, .5);
+  box-shadow: 0 0 0 2px var(--accent), 0 0 14px 2px rgba(var(--accent-rgb), .5);
   transition: box-shadow .3s ease;
 }
 
@@ -1500,6 +1581,15 @@ body.light .cal-tab-btn.active {
   background: var(--accent);
   border-color: var(--accent);
   box-shadow: inset 0 1px 3px rgba(0,0,0,.15);
+  color: #ffffff;
+}
+
+body.light .cal-trainee-arrow.open {
+  color: #ffffff;
+}
+
+body.light .cal-trainee-name-btn:hover .cal-trainee-arrow.open,
+body.light .inline-cal-toggle:hover .cal-trainee-arrow.open {
   color: #ffffff;
 }
 

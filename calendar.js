@@ -10,7 +10,7 @@ import {
   aptGroupsHtml, wireChips, sortRowsByMode, raceDateLabel
 } from './core.js';
 import { addToMyList, removeFromMyList, toggleTrophy, findRaceByExactName, exportList, importList } from './standard-view.js';
-import { applySettingsUI, renderMainView } from './main.js';
+import { applySettingsUI, renderMainView, closeSettingsPanel } from './main.js';
 
 // 3 in-career years, 12 months x Early/Late = 24 date slots each.
 // "Out-of-Bond" has no fixed date, so it isn't part of the grid.
@@ -254,12 +254,16 @@ function calTraineePanelHtml(activeTrainee) {
 function calSidebarHtml(activeTrainee, isEmpty) {
   const iconBlock = isEmpty ? blankIconHtml(96) : iconHtml(activeTrainee.name, 96);
   return `
-  <div class="cal-sidebar">
-    <div class="cal-trainee-box">
+  <div class="cal-sidebar${calTraineePanelOpen ? ' panel-open' : ''}">
+    <div class="cal-trainee-box${calTraineePanelOpen ? ' panel-open' : ''}">
       ${iconBlock}
       <button class="cal-trainee-name-btn" id="cal-trainee-btn">
         <span class="cal-trainee-name">${escapeHtml(activeTrainee.name)}</span>
-        <span class="cal-trainee-arrow">▾</span>
+        <span class="cal-trainee-arrow">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
       </button>
       ${calTraineePanelOpen ? calTraineePanelHtml(activeTrainee) : ''}
     </div>
@@ -349,8 +353,33 @@ function wireCalTraineePanel(host, activeTrainee) {
   const btn = document.getElementById('cal-trainee-btn');
   if (btn) btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    calTraineePanelOpen = !calTraineePanelOpen;
-    renderCalendarView();
+    closeSettingsPanel();
+
+    if (calTraineePanelOpen) {
+      // Closing: animate the arrow and panel back on their existing nodes
+      // first (a real before/after state to transition between), then
+      // rebuild once the transition has actually finished.
+      calTraineePanelOpen = false;
+      const arrow = btn.querySelector('.cal-trainee-arrow');
+      const panel = document.getElementById('cal-trainee-panel');
+      if (arrow) arrow.classList.remove('open');
+      if (panel) panel.classList.remove('open');
+      setTimeout(renderCalendarView, 250);
+    } else {
+      // Opening: rebuild immediately with the arrow/panel in their closed
+      // visual state, force a reflow so the browser registers that state,
+      // then flip both to "open" in the same frame so the rotation and the
+      // panel's reveal animate together instead of one lagging the other.
+      calTraineePanelOpen = true;
+      renderCalendarView();
+      const freshPanel = document.getElementById('cal-trainee-panel');
+      const freshArrow = document.querySelector('#cal-trainee-btn .cal-trainee-arrow');
+      if (freshPanel) freshPanel.getBoundingClientRect(); // force reflow
+      requestAnimationFrame(() => {
+        if (freshArrow) freshArrow.classList.add('open');
+        if (freshPanel) freshPanel.classList.add('open');
+      });
+    }
   });
 
   const panel = document.getElementById('cal-trainee-panel');
@@ -409,7 +438,11 @@ function wireCalTraineePanel(host, activeTrainee) {
 export function closeCalTraineePanel() {
   if (calTraineePanelOpen) {
     calTraineePanelOpen = false;
-    renderCalendarView();
+    const arrow = document.querySelector('.cal-trainee-arrow');
+    const panel = document.getElementById('cal-trainee-panel');
+    if (arrow) arrow.classList.remove('open');
+    if (panel) panel.classList.remove('open');
+    setTimeout(renderCalendarView, 250);
   }
 }
 

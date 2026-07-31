@@ -23,6 +23,7 @@ export function renderMainView() {
 
 export function applySettingsUI() {
   const lightToggle = document.getElementById('toggle-light-mode');
+  const colorThemeToggle = document.getElementById('toggle-color-theme');
   const trainToggle = document.getElementById('toggle-custom-trainee');
   const raceSearchToggle = document.getElementById('toggle-race-search');
   const trophyToggle = document.getElementById('toggle-custom-trophy');
@@ -34,8 +35,10 @@ export function applySettingsUI() {
   if (!state.settings.allowRaceSearch) state.settings.allowCustomTrophies = true;
 
   document.body.classList.toggle('light', !!state.settings.lightMode);
+  document.body.classList.toggle('dirt', state.settings.colorTheme === 'dirt');
 
   if (lightToggle) lightToggle.checked = !!state.settings.lightMode;
+  if (colorThemeToggle) colorThemeToggle.checked = state.settings.colorTheme === 'dirt';
   if (trainToggle) trainToggle.checked = !!state.settings.allowCustomTrainees;
   if (raceSearchToggle) raceSearchToggle.checked = !!state.settings.allowRaceSearch;
   if (trophyToggle) {
@@ -51,7 +54,7 @@ export function applySettingsUI() {
   }
 }
 
-function closeSettingsPanel() {
+export function closeSettingsPanel() {
   const panel = document.getElementById('settings-panel');
   if (panel) panel.classList.remove('show');
 }
@@ -86,12 +89,14 @@ async function init() {
   if (settingsBtn && settingsPanel) {
     settingsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
+      closeCalTraineePanel();
       settingsPanel.classList.toggle('show');
     });
     settingsPanel.addEventListener('click', e => e.stopPropagation());
   }
 
   const lightToggle = document.getElementById('toggle-light-mode');
+  const colorThemeToggle = document.getElementById('toggle-color-theme');
   const trainToggle = document.getElementById('toggle-custom-trainee');
   const raceSearchToggle = document.getElementById('toggle-race-search');
   const trophyToggle = document.getElementById('toggle-custom-trophy');
@@ -99,6 +104,10 @@ async function init() {
 
   if (lightToggle) lightToggle.addEventListener('change', () => {
     state.settings.lightMode = lightToggle.checked;
+    saveState(); applySettingsUI();
+  });
+  if (colorThemeToggle) colorThemeToggle.addEventListener('change', () => {
+    state.settings.colorTheme = colorThemeToggle.checked ? 'dirt' : 'turf';
     saveState(); applySettingsUI();
   });
   if (trainToggle) trainToggle.addEventListener('change', () => {
@@ -117,6 +126,7 @@ async function init() {
   if (calViewToggle) calViewToggle.addEventListener('change', () => {
     state.settings.calendarViewMode = calViewToggle.checked;
     saveState(); applySettingsUI(); renderMainView();
+    closeSettingsPanel();
   });
 
   document.addEventListener('click', () => {

@@ -31,6 +31,7 @@ export let state = {
     allowCustomTrophies: true,
     calendarViewMode: false,
     lightMode: false,
+    colorTheme: 'turf', // 'turf' (Emerald & Jade) | 'dirt' (Amber & Bronze)
     activeTraineeId: null
   }
 };
@@ -52,6 +53,7 @@ export async function loadState() {
   }
   if (state.settings.calendarViewMode === undefined) state.settings.calendarViewMode = false;
   if (state.settings.lightMode === undefined) state.settings.lightMode = false;
+  if (state.settings.colorTheme === undefined) state.settings.colorTheme = 'turf';
   if (state.settings.activeTraineeId === undefined) state.settings.activeTraineeId = null;
   if (state.settings.allowRaceSearch === undefined) state.settings.allowRaceSearch = true;
   // Custom trophies can't meaningfully be off when race search itself is off —
