@@ -855,7 +855,7 @@ footer {
   line-height: 1.7;
 }
 
-/* ===== Experimental: Inline calendar (per My List card) ===== */
+/* ===== Inline calendar (per My List card) ===== */
 .inline-cal {
   border-top: 1px solid var(--line-soft);
   margin-top: 12px;
@@ -889,7 +889,7 @@ footer {
   display: block;
 }
 
-/* ===== Experimental: Full Calendar View ===== */
+/* ===== Full Calendar View ===== */
 /* Calendar View needs more horizontal room than the 1080px .wrap gives the
    rest of the site, so it breaks out to the full viewport width and centers
    itself independently instead of inheriting .wrap's narrower column. */

@@ -15,13 +15,13 @@ export const GRADE_INFO = {
 export const CATS = [
   { key: "turf", label: "Turf", group: "surface", stat: "Power / Acceleration" },
   { key: "dirt", label: "Dirt", group: "surface", stat: "Power / Acceleration" },
-  { key: "short", label: "Short", group: "distance", stat: "Speed" },
+  { key: "sprint", label: "Sprint", group: "distance", stat: "Speed" },
   { key: "mile", label: "Mile", group: "distance", stat: "Speed" },
   { key: "medium", label: "Medium", group: "distance", stat: "Speed" },
   { key: "long", label: "Long", group: "distance", stat: "Speed" },
 ];
 export const SURFACE_KEYS = ["turf", "dirt"];
-export const DISTANCE_KEYS = ["short", "mile", "medium", "long"];
+export const DISTANCE_KEYS = ["sprint", "mile", "medium", "long"];
 
 export let state = {
   myList: [],

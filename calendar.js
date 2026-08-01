@@ -79,7 +79,7 @@ let calTraineeSort = "default"; // default | az | za
 const CAL_EMPTY_TRAINEE = {
   id: "__empty__",
   name: "Add Trainee Here...",
-  aptitudes: { turf: "A", dirt: "A", short: "A", mile: "A", medium: "A", long: "A" },
+  aptitudes: { turf: "A", dirt: "A", sprint: "A", mile: "A", medium: "A", long: "A" },
   trophies: []
 };
 

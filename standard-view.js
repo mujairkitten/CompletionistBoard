@@ -329,7 +329,7 @@ export function addCustom() {
   const input = document.getElementById('custom-name');
   const name = input.value.trim();
   if (!name) { input.focus(); return; }
-  addToMyList(name, { turf: "A", dirt: "A", short: "A", mile: "A", medium: "A", long: "A" });
+  addToMyList(name, { turf: "A", dirt: "A", sprint: "A", mile: "A", medium: "A", long: "A" });
   input.value = "";
 }
 

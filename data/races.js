@@ -157,4 +157,4 @@ export const RACES = [
 
 // Maps a race's Track/Distance text (as given in the spreadsheet) to the aptitude keys used above.
 export const TRACK_TO_APT_KEY = { Turf: "turf", Dirt: "dirt" };
-export const DIST_TO_APT_KEY = { Sprint: "short", Mile: "mile", Medium: "medium", Long: "long" };
+export const DIST_TO_APT_KEY = { Sprint: "sprint", Mile: "mile", Medium: "medium", Long: "long" };
