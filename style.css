@@ -897,13 +897,10 @@ footer {
 /* Calendar View needs more horizontal room than the 1080px .wrap gives the
    rest of the site, so it breaks out to the full viewport width and centers
    itself independently instead of inheriting .wrap's narrower column. */
-#calendar-view {
-  width: 100vw;
-  position: relative;
-  left: 50%;
-  margin-left: -50vw;
-}
-
+/* No longer needs a vw-based breakout hack — calendar-view lives outside
+   .wrap in the markup now, so it's naturally full-width without relying on
+   100vw, which can mismatch the true visible viewport on some mobile
+   browsers (notably foldables with dynamic/collapsing toolbars). */
 .calendar-layout {
   display: flex;
   align-items: flex-start;
@@ -1054,7 +1051,7 @@ footer {
 .cal-cell-empty {
   background: transparent;
   border-style: dashed;
-  opacity: .35;
+  opacity: .55;
 }
 
 .cal-race-row {
