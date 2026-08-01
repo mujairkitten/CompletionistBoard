@@ -410,6 +410,10 @@ section.block {
   padding-right: 26px;
 }
 
+.db-card-top.no-num {
+  padding-right: 0;
+}
+
 .db-num {
   position: absolute;
   top: 10px;
@@ -514,7 +518,7 @@ body.light .chip:hover {
   transition: box-shadow .15s ease, border-color .15s ease;
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .mycard { background: var(--panel); }
+  .mycard, .cal-trainee-box, .cal-tool-box, .modal-box { background: var(--panel); }
 }
 
 .mycard:hover {
@@ -942,9 +946,7 @@ footer {
   align-items: center;
   gap: 8px;
   box-shadow: var(--glass-highlight);
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .cal-trainee-box { background: var(--panel); }
+  position: relative;
 }
 
 .cal-trainee-name {
@@ -961,9 +963,6 @@ footer {
   border-radius: 14px;
   padding: 14px 16px;
   box-shadow: var(--glass-highlight);
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .cal-tool-box { background: var(--panel); }
 }
 
 .cal-tool-box-title {
@@ -1152,10 +1151,6 @@ footer {
 }
 
 /* Trainee switcher panel */
-.cal-trainee-box {
-  position: relative;
-}
-
 /* backdrop-filter alone creates a stacking context (even without z-index),
    so cal-trainee-box and cal-tool-box — plain siblings, neither with an
    explicit z-index — tie at that implicit level and fall back to DOM order,
@@ -1374,9 +1369,6 @@ footer {
   overflow-y: auto;
   box-shadow: var(--glass-highlight), 0 20px 50px rgba(0, 0, 0, .5), 0 0 20px rgba(var(--accent-rgb), .12);
   contain: paint;
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .modal-box { background: var(--panel); }
 }
 
 .modal-head {

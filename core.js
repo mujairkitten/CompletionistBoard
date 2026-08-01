@@ -166,9 +166,10 @@ export function raceDateLabel(r) {
 }
 
 export function weakAptitudes(apt) {
+  const dThreshold = GRADES.indexOf("D");
   return CATS
     .map(c => ({ ...c, grade: gradeOf(apt[c.key]) }))
-    .filter(c => GRADES.indexOf(c.grade) >= GRADES.indexOf("D"))
+    .filter(c => GRADES.indexOf(c.grade) >= dThreshold)
     .sort((a, b) => GRADES.indexOf(b.grade) - GRADES.indexOf(a.grade));
 }
 

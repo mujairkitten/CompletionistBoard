@@ -24,14 +24,18 @@ export function renderDatabase() {
   document.getElementById('db-gate').textContent = DATABASE.length;
 
   const addedNames = new Set(state.myList.map(t => t.name.toLowerCase()));
+  // Trainee names are unique (one entry per character), so this is a safe,
+  // O(1)-lookup stand-in for DATABASE.indexOf(d) — avoids an O(n) scan per
+  // rendered card (O(n²) overall) on every keystroke in the search box.
+  const indexByName = new Map(DATABASE.map((d, i) => [d.name, i]));
 
   grid.innerHTML = list.map((d) => {
-    const realIndex = DATABASE.indexOf(d);
+    const realIndex = indexByName.get(d.name);
     const already = addedNames.has(d.name.toLowerCase());
     return `
     <div class="db-card">
-      <span class="db-num">${String(realIndex + 1).padStart(2, '0')}</span>
-      <div class="db-card-top">
+      ${filter ? '' : `<span class="db-num">${String(realIndex + 1).padStart(2, '0')}</span>`}
+      <div class="db-card-top${filter ? ' no-num' : ''}">
         ${iconHtml(d.name, 40)}
         <div class="db-name">${escapeHtml(d.name)}</div>
       </div>
