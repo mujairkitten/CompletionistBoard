@@ -1,8 +1,3 @@
-// Full Calendar View (the alternate, optional layout) plus the calendar
-// "model" logic (which races belong to which date slot, done/pending state,
-// custom ordering) that's shared with the inline per-card calendar rendered
-// by standard-view.js.
-
 import { DATABASE } from './data/database.js';
 import { RACES } from './data/races.js';
 import {
@@ -12,8 +7,6 @@ import {
 import { addToMyList, removeFromMyList, toggleTrophy, findRaceByExactName, exportList, importList } from './standard-view.js';
 import { applySettingsUI, renderMainView, closeSettingsPanel } from './main.js';
 
-// 3 in-career years, 12 months x Early/Late = 24 date slots each.
-// "Out-of-Bond" has no fixed date, so it isn't part of the grid.
 export const CAL_YEAR_GROUPS = ["Junior", "Classic", "Senior"];
 const CAL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const CAL_TURNS = ["Early", "Late"];
@@ -32,7 +25,6 @@ function isRaceDone(t, raceName) {
   const tr = trophyForRace(t, raceName);
   return !!(tr && tr.checked);
 }
-// Pending order for a slot: any saved custom order first, then remaining races in dataset order.
 function pendingOrderForSlot(t, slotKey, pendingRaces) {
   if (!t.calendarOrder) t.calendarOrder = {};
   const saved = t.calendarOrder[slotKey] || [];
@@ -41,8 +33,6 @@ function pendingOrderForSlot(t, slotKey, pendingRaces) {
   const rest = pendingRaces.filter(r => !savedNames.has(r.name));
   return [...savedRaces, ...rest];
 }
-// Reorders a slot's pending list by moving draggedName to just before targetName
-// (or to the end, if targetName is null — e.g. dropped on empty cell space).
 function reorderRaceInSlot(t, slotKey, allSlotRaces, draggedName, targetName) {
   const pending = allSlotRaces.filter(r => !isRaceDone(t, r.name));
   let ordered = pendingOrderForSlot(t, slotKey, pending).map(r => r.name);
@@ -71,11 +61,10 @@ function calendarToggleRace(t, race) {
 let calViewTab = "Junior";
 
 let calTraineePanelOpen = false;
+let calTraineePanelRevealed = false;
 let calTraineeSearch = "";
-let calTraineeSort = "default"; // default | az | za
+let calTraineeSort = "default";
 
-// Placeholder shown in Calendar View when My List is empty — lets the grid
-// render (greyed out) instead of just showing a wall of text.
 const CAL_EMPTY_TRAINEE = {
   id: "__empty__",
   name: "Add Trainee Here...",
@@ -90,7 +79,7 @@ function sortTraineeRows(rows) {
 export function calGradeColor(grade) {
   if (grade === 'G1') return 'var(--g1)';
   if (grade === 'G2') return 'var(--g2)';
-  return 'var(--g3)'; // G3
+  return 'var(--g3)';
 }
 function calRaceRowHtml(r, opts) {
   const draggable = !!opts.draggable;
@@ -107,7 +96,6 @@ function calRaceRowHtml(r, opts) {
     </div>`;
 }
 
-// ---- Calendar rendering (shared by the full Calendar View and the inline per-card calendar) ----
 function calCellHtml(t, yearGroup, month, turn) {
   const slotKey = calSlotKey(month, turn);
   const slotRaces = racesForSlot(yearGroup, month, turn);
@@ -184,7 +172,7 @@ export function wireCalPage(root, t, onChange) {
       if (!dragCtx) return;
       const cell = row.closest('.cal-cell');
       const slotKey = cell.dataset.slot;
-      if (slotKey !== dragCtx.slotKey) return; // reordering only makes sense within the same date slot
+      if (slotKey !== dragCtx.slotKey) return;
       const yearGroup = cell.dataset.year;
       const [month, turn] = slotKey.split('|');
       reorderRaceInSlot(t, slotKey, racesForSlot(yearGroup, month, turn), dragCtx.raceName, row.dataset.race);
@@ -192,7 +180,6 @@ export function wireCalPage(root, t, onChange) {
     });
   });
 
-  // Dropping on empty cell space (not on a specific row) sends the race to the end of the pending list.
   root.querySelectorAll('.cal-cell').forEach(cell => {
     cell.addEventListener('dragover', (e) => { if (dragCtx) e.preventDefault(); });
     cell.addEventListener('drop', (e) => {
@@ -241,8 +228,8 @@ function calTraineePanelHtml(activeTrainee) {
     <input type="text" class="search" id="cal-trainee-search" placeholder="Search trainees…" value="${escapeHtml(calTraineeSearch)}">
     <div class="cal-trainee-sort">
       <button class="sort-btn ${calTraineeSort === 'default' ? 'active' : ''}" data-sort="default">Default</button>
-      <button class="sort-btn ${calTraineeSort === 'az' ? 'active' : ''}" data-sort="az">A–Z</button>
-      <button class="sort-btn ${calTraineeSort === 'za' ? 'active' : ''}" data-sort="za">Z–A</button>
+      <button class="sort-btn ${calTraineeSort === 'az' ? 'active' : ''}" data-sort="az">A-Z</button>
+      <button class="sort-btn ${calTraineeSort === 'za' ? 'active' : ''}" data-sort="za">Z-A</button>
     </div>
     <div class="cal-trainee-group-label">In My List</div>
     <div class="cal-trainee-list">${mineHtml}</div>
@@ -356,28 +343,23 @@ function wireCalTraineePanel(host, activeTrainee) {
     closeSettingsPanel();
 
     if (calTraineePanelOpen) {
-      // Closing: animate the arrow and panel back on their existing nodes
-      // first (a real before/after state to transition between), then
-      // rebuild once the transition has actually finished.
       calTraineePanelOpen = false;
+      calTraineePanelRevealed = false;
       const arrow = btn.querySelector('.cal-trainee-arrow');
       const panel = document.getElementById('cal-trainee-panel');
       if (arrow) arrow.classList.remove('open');
       if (panel) panel.classList.remove('open');
       setTimeout(renderCalendarView, 250);
     } else {
-      // Opening: rebuild immediately with the arrow/panel in their closed
-      // visual state, force a reflow so the browser registers that state,
-      // then flip both to "open" in the same frame so the rotation and the
-      // panel's reveal animate together instead of one lagging the other.
       calTraineePanelOpen = true;
       renderCalendarView();
       const freshPanel = document.getElementById('cal-trainee-panel');
       const freshArrow = document.querySelector('#cal-trainee-btn .cal-trainee-arrow');
-      if (freshPanel) freshPanel.getBoundingClientRect(); // force reflow
+      if (freshPanel) freshPanel.getBoundingClientRect();
       requestAnimationFrame(() => {
         if (freshArrow) freshArrow.classList.add('open');
         if (freshPanel) freshPanel.classList.add('open');
+        calTraineePanelRevealed = true;
       });
     }
   });
@@ -386,6 +368,12 @@ function wireCalTraineePanel(host, activeTrainee) {
   if (!panel) return;
 
   panel.addEventListener('click', e => e.stopPropagation());
+
+  if (calTraineePanelOpen && calTraineePanelRevealed) {
+    const arrow = document.querySelector('#cal-trainee-btn .cal-trainee-arrow');
+    panel.classList.add('open');
+    if (arrow) arrow.classList.add('open');
+  }
 
   const searchInput = document.getElementById('cal-trainee-search');
   if (searchInput) {
@@ -408,6 +396,7 @@ function wireCalTraineePanel(host, activeTrainee) {
     row.addEventListener('click', () => {
       state.settings.activeTraineeId = row.dataset.switch;
       calTraineePanelOpen = false;
+      calTraineePanelRevealed = false;
       saveState();
       renderCalendarView();
     });
@@ -421,6 +410,7 @@ function wireCalTraineePanel(host, activeTrainee) {
       const added = state.myList[state.myList.length - 1];
       state.settings.activeTraineeId = added.id;
       calTraineePanelOpen = false;
+      calTraineePanelRevealed = false;
       saveState();
       renderCalendarView();
     });
@@ -438,6 +428,7 @@ function wireCalTraineePanel(host, activeTrainee) {
 export function closeCalTraineePanel() {
   if (calTraineePanelOpen) {
     calTraineePanelOpen = false;
+    calTraineePanelRevealed = false;
     const arrow = document.querySelector('.cal-trainee-arrow');
     const panel = document.getElementById('cal-trainee-panel');
     if (arrow) arrow.classList.remove('open');

@@ -1,16 +1,12 @@
-// Shared constants, persistent state, and generic rendering helpers used by
-// both the standard view (Trainee Database + My List) and Calendar View.
-
-export const GRADES = ["S", "A", "B", "C", "D", "E", "F", "G"];
+export const GRADES = ["A", "B", "C", "D", "E", "F", "G"];
 export const GRADE_INFO = {
-  S: { pct: "+5%", tip: "Peak. Only reachable via sparks — base aptitude caps at A.", tier: "s" },
   A: { pct: "100%", tip: "Baseline. No penalty, safe to race here.", tier: "a" },
-  B: { pct: "−10%", tip: "Minor drag. One matching spark usually bumps this to A.", tier: "b" },
-  C: { pct: "−20%", tip: "Noticeable penalty. Worth 4-6 sparks before racing seriously.", tier: "c" },
-  D: { pct: "−40%", tip: "Steep drop. Push through only if the trophy is required. Needs 7-9 sparks.", tier: "d" },
-  E: { pct: "−60%", tip: "Severe — accel takes a hit too on distance. Avoid unless mandatory. Needs atleast 10 sparks.", tier: "e" },
-  F: { pct: "−80%", tip: "Near-crippling. Even max sparks (12) only gives you to C. Hope that Inspiration sessions gives you more.", tier: "f" },
-  G: { pct: "−90%", tip: "Worst case. Only for a must-have trophy. Even max sparks (12) only gives you to C. Hope that Inspiration sessions gives you more.", tier: "g" },
+  B: { pct: "-10%", tip: "Minor drag. One matching spark usually bumps this to A.", tier: "b" },
+  C: { pct: "-20%", tip: "Noticeable penalty. Worth 4-6 sparks before racing seriously.", tier: "c" },
+  D: { pct: "-40%", tip: "Steep drop. Push through only if the trophy is required. Needs 7-9 sparks.", tier: "d" },
+  E: { pct: "-60%", tip: "Severe — accel takes a hit too on distance. Avoid unless mandatory. Needs atleast 10 sparks.", tier: "e" },
+  F: { pct: "-80%", tip: "Near-crippling. Even max sparks (12) only gives you to C. Hope that Inspiration sessions gives you more.", tier: "f" },
+  G: { pct: "-90%", tip: "Worst case. Only for a must-have trophy. Even max sparks (12) only gives you to C. Hope that Inspiration sessions gives you more.", tier: "g" },
 };
 export const CATS = [
   { key: "turf", label: "Turf", group: "surface", stat: "Power / Acceleration" },
@@ -31,7 +27,7 @@ export let state = {
     allowCustomTrophies: true,
     calendarViewMode: false,
     lightMode: false,
-    colorTheme: 'turf', // 'turf' (Emerald & Jade) | 'dirt' (Amber & Bronze)
+    colorTheme: 'turf',
     activeTraineeId: null
   }
 };
@@ -56,8 +52,6 @@ export async function loadState() {
   if (state.settings.colorTheme === undefined) state.settings.colorTheme = 'turf';
   if (state.settings.activeTraineeId === undefined) state.settings.activeTraineeId = null;
   if (state.settings.allowRaceSearch === undefined) state.settings.allowRaceSearch = true;
-  // Custom trophies can't meaningfully be off when race search itself is off —
-  // with no search, every entry is inherently a custom one.
   if (!state.settings.allowRaceSearch) state.settings.allowCustomTrophies = true;
   delete state.settings.inlineCalendar;
 }
@@ -100,8 +94,6 @@ export function showTooltip(target, catKey, aptValue) {
   const rect = target.getBoundingClientRect();
   tooltipEl.style.left = Math.min(rect.left, window.innerWidth - 236) + "px";
 
-  // Measure the box as actually rendered (varies with how many lines the tip wraps to)
-  // rather than assuming a fixed height, so it always sits flush above the chip.
   const gap = 8;
   const tooltipHeight = tooltipEl.getBoundingClientRect().height;
   let top = rect.top - tooltipHeight - gap;
@@ -126,8 +118,9 @@ export function chipHtml(apt, key) {
     bg = `linear-gradient(90deg, color-mix(in srgb, var(--${tier}) 26%, transparent) 50%, color-mix(in srgb, var(--${altTier}) 26%, transparent) 50%)`;
   }
   const style = `--chip-bg:${bg};--chip-border:${borderMix};--chip-glow:${glowMix};`;
+  const safeJson = JSON.stringify(value).replace(/'/g, '&#39;');
   return `<button class="chip" style="${style}"
-            data-cat="${key}" data-json='${JSON.stringify(value)}'
+            data-cat="${key}" data-json='${safeJson}'
           >${label}</button>`;
 }
 export function aptGroupsHtml(apt) {

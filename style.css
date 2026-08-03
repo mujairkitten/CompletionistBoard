@@ -13,20 +13,13 @@
   --accent2: #2bcfa8;
   --accent-rgb: 34, 181, 115;
   --accent2-rgb: 43, 207, 168;
-  /* Glassmorphism tuning (dark mode only). Two tiers: "glass" surfaces get a
-     real backdrop-filter blur and are reserved for low-count/singleton
-     elements (topbar, My List cards, Calendar View panels, modal). "Faux"
-     surfaces are tinted/translucent but have NO blur — used for anything
-     that can appear in large numbers (db-grid, up to 62 cards) or that
-     stacks visually on top of an already-blurred surface (dropdowns,
-     tooltips), so we never compound blur-on-blur. */
+
   --glass-bg: rgba(23, 26, 34, .58);
   --glass-bg-soft: rgba(23, 26, 34, .5);
   --glass-border: rgba(255, 255, 255, .09);
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, .06);
   --faux-glass-bg: rgba(23, 26, 34, .74);
   --faux-glass-card-bg: rgba(23, 26, 34, .74);
-  --s: #ffb84d;
   --a: #4ee38a;
   --b: #9fdb5c;
   --c: #e8d94f;
@@ -39,7 +32,6 @@
   --g3: #55c470;
   font-family: "Quicksand", sans-serif;
 }
-
 body.light {
   --bg: #f3f4f9;
   --bg-alt: #ffffff;
@@ -55,8 +47,7 @@ body.light {
   --accent2: #187560;
   --accent-rgb: 24, 122, 77;
   --accent2-rgb: 24, 117, 96;
-  /* Glass theme is dark-mode only — fall these back to the original
-     light-mode solid colors so nothing visually changes here. */
+
   --glass-bg: var(--bg-alt);
   --glass-bg-soft: var(--panel);
   --glass-border: var(--line);
@@ -64,10 +55,6 @@ body.light {
   --faux-glass-bg: var(--panel-2);
   --faux-glass-card-bg: var(--panel);
 }
-
-/* Color theme: Dirt (Amber & Bronze). Independent of light/dark mode — only
-   swaps the accent trio, never bg/panel/ink, so it composes cleanly with
-   either mode. */
 body.dirt {
   --accent: #e0a640;
   --accent-dim: #b9822e;
@@ -86,7 +73,6 @@ body.light.dirt {
 * {
   box-sizing: border-box;
 }
-
 body {
   margin: 0;
   overflow-x: hidden;
@@ -98,13 +84,11 @@ body {
   padding-bottom: 70px;
   font-family: "Quicksand", sans-serif;
 }
-
 .wrap {
   max-width: 1080px;
   margin: 0 auto;
   padding: 0 18px;
 }
-
 .topbar {
   background: var(--glass-bg);
   backdrop-filter: blur(10px);
@@ -120,20 +104,17 @@ body {
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .topbar { background: var(--bg-alt); }
 }
-
 .topbar-inner {
   display: flex;
   align-items: center;
   gap: 18px;
   flex-wrap: wrap;
 }
-
 .brand {
   display: flex;
   align-items: baseline;
   gap: 10px;
 }
-
 .brand h1 {
   font-family: "Quicksand", sans-serif;
   font-weight: 700;
@@ -141,14 +122,12 @@ body {
   letter-spacing: .01em;
   margin: 0;
 }
-
 .topbar-actions {
   display: flex;
   gap: 8px;
   margin-left: auto;
   flex-wrap: wrap;
 }
-
 .btn {
   font-family: "Quicksand", sans-serif;
   font-size: 12.5px;
@@ -162,32 +141,26 @@ body {
   cursor: pointer;
   transition: box-shadow .15s ease, border-color .15s ease, color .15s ease;
 }
-
 .btn:hover {
   border-color: var(--accent-dim);
   color: var(--accent2);
   box-shadow: 0 0 12px rgba(var(--accent-rgb), .35);
 }
-
 .btn.small {
   padding: 5px 12px;
   font-size: 11px;
 }
-
 .btn.ghost {
   background: transparent;
 }
-
 .icon-btn {
   padding: 8px 12px;
   font-size: 15px;
   line-height: 1;
 }
-
 .settings-wrap {
   position: relative;
 }
-
 .settings-panel {
   display: none;
   position: absolute;
@@ -203,11 +176,9 @@ body {
   flex-direction: column;
   gap: 8px;
 }
-
 .settings-panel.show {
   display: flex;
 }
-
 .settings-group-label {
   font-family: "Quicksand", sans-serif;
   font-weight: 700;
@@ -217,12 +188,10 @@ body {
   color: var(--ink-faint);
   margin-top: 2px;
 }
-
 .settings-divider {
   border-top: 1px solid var(--line);
   margin: 2px 0;
 }
-
 .settings-row {
   display: flex;
   align-items: center;
@@ -233,17 +202,14 @@ body {
   font-size: 13px;
   color: var(--ink);
 }
-
 .settings-row-sub {
   padding-left: 12px;
   font-size: 12px;
   color: var(--ink-dim);
 }
-
 .settings-row-disabled {
   opacity: .45;
 }
-
 .switch {
   position: relative;
   display: inline-block;
@@ -251,14 +217,12 @@ body {
   height: 22px;
   flex-shrink: 0;
 }
-
 .switch input {
   opacity: 0;
   width: 0;
   height: 0;
   position: absolute;
 }
-
 .switch-slider {
   position: absolute;
   inset: 0;
@@ -267,11 +231,9 @@ body {
   cursor: pointer;
   transition: background .15s ease;
 }
-
 .switch input:disabled + .switch-slider {
   cursor: not-allowed;
 }
-
 .switch-slider::before {
   content: "";
   position: absolute;
@@ -284,24 +246,19 @@ body {
   transition: transform .15s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
 }
-
 .switch input:checked + .switch-slider {
   background: var(--accent);
   box-shadow: 0 0 10px rgba(var(--accent-rgb), .5);
 }
-
 .switch input:checked + .switch-slider::before {
   transform: translateX(16px);
 }
-
 input[type=file] {
   display: none;
 }
-
 section.block {
   margin: 30px 0;
 }
-
 .block-head {
   display: flex;
   align-items: center;
@@ -309,7 +266,6 @@ section.block {
   margin-bottom: 14px;
   flex-wrap: wrap;
 }
-
 .gate-badge {
   width: 30px;
   height: 30px;
@@ -326,7 +282,6 @@ section.block {
   flex-shrink: 0;
   box-shadow: 0 0 10px rgba(var(--accent-rgb), .4);
 }
-
 .block-head h2 {
   font-family: "Quicksand", sans-serif;
   font-size: 19px;
@@ -334,27 +289,23 @@ section.block {
   letter-spacing: .01em;
   margin: 0;
 }
-
 .block-head .count {
   font-family: "Quicksand", sans-serif;
   font-size: 12px;
   font-weight: 600;
   color: var(--ink-dim);
 }
-
 .block-head .desc {
   font-size: 12.5px;
   color: var(--ink-dim);
   margin-left: auto;
 }
-
 .search-row {
   display: flex;
   gap: 8px;
   margin-bottom: 14px;
   flex-wrap: wrap;
 }
-
 .search {
   font-family: "Quicksand", sans-serif;
   font-size: 13px;
@@ -368,23 +319,19 @@ section.block {
   min-width: 180px;
   transition: box-shadow .15s ease, border-color .15s ease;
 }
-
 .search:focus {
   outline: none;
   border-color: var(--accent-dim);
   box-shadow: 0 0 12px rgba(var(--accent-rgb), .3);
 }
-
 .search::placeholder {
   color: var(--ink-faint);
 }
-
 .db-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 10px;
 }
-
 .db-card {
   background: var(--faux-glass-card-bg);
   border: 1px solid var(--glass-border);
@@ -397,23 +344,19 @@ section.block {
   box-shadow: var(--glass-highlight);
   transition: box-shadow .15s ease, border-color .15s ease;
 }
-
 .db-card:hover {
   border-color: var(--accent-dim);
   box-shadow: var(--glass-highlight), 0 0 18px rgba(var(--accent-rgb), .16);
 }
-
 .db-card-top {
   display: flex;
   align-items: center;
   gap: 8px;
   padding-right: 26px;
 }
-
 .db-card-top.no-num {
   padding-right: 0;
 }
-
 .db-num {
   position: absolute;
   top: 10px;
@@ -427,22 +370,18 @@ section.block {
   padding: 2px 6px;
   flex-shrink: 0;
 }
-
 .db-name {
   font-family: "Quicksand", sans-serif;
   font-size: 17px;
   font-weight: 600;
   flex: 1;
 }
-
-/* Aptitude chip groups */
 .apt-groups {
   display: flex;
   align-items: stretch;
   gap: 10px;
   flex-wrap: wrap;
 }
-
 .apt-container {
   display: flex;
   align-items: center;
@@ -453,7 +392,6 @@ section.block {
   padding: 6px 8px;
   background: var(--panel-2);
 }
-
 .chip {
   font-family: "Quicksand", sans-serif;
   font-weight: 700;
@@ -469,32 +407,25 @@ section.block {
   box-shadow: none;
   transition: box-shadow .15s ease;
 }
-
 .chip:hover {
   box-shadow: 0 0 8px 0 var(--chip-glow, transparent);
 }
-
-/* Light mode: subtle raised/pressed (skeuomorphic) look instead of glow */
 body.light .chip {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), inset 0 -1px 2px rgba(0, 0, 0, .07), 0 1px 2px rgba(0, 0, 0, .10);
   border-color: var(--line);
 }
-
 body.light .chip:hover {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 -1px 2px rgba(0, 0, 0, .08), 0 2px 6px rgba(0, 0, 0, .16);
   transform: translateY(-1px);
 }
-
 .add-btn {
   align-self: flex-start;
 }
-
 .mylist {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-
 .empty-note {
   text-align: center;
   padding: 34px 16px;
@@ -505,7 +436,6 @@ body.light .chip:hover {
   border: 1px dashed var(--line);
   border-radius: 14px;
 }
-
 .mycard {
   background: var(--glass-bg-soft);
   backdrop-filter: blur(8px);
@@ -520,30 +450,25 @@ body.light .chip:hover {
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .mycard, .cal-trainee-box, .cal-tool-box, .modal-box { background: var(--panel); }
 }
-
 .mycard:hover {
   border-color: var(--accent-dim);
   box-shadow: var(--glass-highlight), 0 0 18px rgba(var(--accent-rgb), .14);
 }
-
 .mycard-head {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 10px;
 }
-
 .mycard-name {
   font-family: "Quicksand", sans-serif;
   font-size: 19px;
   font-weight: 700;
   flex: 1;
 }
-
 .cats-row {
   margin-bottom: 10px;
 }
-
 .focus-line {
   font-size: 12px;
   font-family: "Quicksand", sans-serif;
@@ -554,30 +479,25 @@ body.light .chip:hover {
   gap: 6px;
   flex-wrap: wrap;
 }
-
 .focus-line b {
   font-family: "Quicksand", sans-serif;
   font-size: 10.5px;
   letter-spacing: .03em;
   font-weight: 700;
 }
-
 .focus-line.clear {
   color: var(--a);
 }
-
 .trophy-section {
   border-top: 1px solid var(--line-soft);
   padding-top: 10px;
 }
-
 .trophy-top {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 8px;
 }
-
 .trophy-top .label {
   font-family: "Quicksand", sans-serif;
   font-size: 10.5px;
@@ -585,7 +505,6 @@ body.light .chip:hover {
   letter-spacing: .04em;
   color: var(--ink-dim);
 }
-
 .progress-track {
   flex: 1;
   height: 8px;
@@ -594,13 +513,11 @@ body.light .chip:hover {
   border-radius: 999px;
   overflow: hidden;
 }
-
 .progress-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--accent), var(--accent2));
   box-shadow: 0 0 8px rgba(var(--accent2-rgb), .6);
 }
-
 .progress-pct {
   font-family: "Quicksand", sans-serif;
   font-size: 11px;
@@ -608,14 +525,12 @@ body.light .chip:hover {
   min-width: 66px;
   text-align: right;
 }
-
 .trophy-list {
   display: flex;
   flex-direction: column;
   gap: 4px;
   margin-bottom: 8px;
 }
-
 .trophy-item {
   display: flex;
   align-items: center;
@@ -624,18 +539,15 @@ body.light .chip:hover {
   font-size: 12.5px;
   font-weight: 500;
 }
-
 .trophy-item input[type=checkbox] {
   accent-color: var(--accent);
   width: 14px;
   height: 14px;
 }
-
 .trophy-item.checked span {
   text-decoration: line-through;
   color: var(--ink-faint);
 }
-
 .trophy-item .rm {
   margin-left: auto;
   background: none;
@@ -646,17 +558,14 @@ body.light .chip:hover {
   line-height: 1;
   padding: 2px 4px;
 }
-
 .trophy-item .rm:hover {
   color: var(--f);
 }
-
 .add-trophy {
   display: flex;
   gap: 6px;
   position: relative;
 }
-
 .add-trophy input {
   flex: 1;
   font-family: "Quicksand", sans-serif;
@@ -668,8 +577,6 @@ body.light .chip:hover {
   background: var(--bg);
   color: var(--ink);
 }
-
-/* Race picker dropdown */
 .race-suggest {
   display: none;
   position: absolute;
@@ -684,11 +591,9 @@ body.light .chip:hover {
   z-index: 50;
   box-shadow: 0 10px 30px rgba(0, 0, 0, .5), 0 0 16px rgba(var(--accent-rgb), .12);
 }
-
 .race-suggest.show {
   display: block;
 }
-
 .race-suggest-item {
   display: flex;
   align-items: center;
@@ -699,22 +604,18 @@ body.light .chip:hover {
   cursor: pointer;
   border-bottom: 1px solid var(--line-soft);
 }
-
 .race-suggest-item:last-child {
   border-bottom: none;
 }
-
 .race-suggest-item:hover {
   background: var(--panel);
 }
-
 .race-suggest-empty {
   padding: 10px 12px;
   font-size: 12px;
   font-weight: 500;
   color: var(--ink-faint);
 }
-
 .race-info {
   flex: 1;
   display: flex;
@@ -722,23 +623,19 @@ body.light .chip:hover {
   gap: 1px;
   min-width: 0;
 }
-
 .race-name {
   color: var(--ink);
 }
-
 .race-date {
   font-size: 10px;
   font-weight: 500;
   color: var(--ink-faint);
 }
-
 .race-meta {
   display: flex;
   gap: 4px;
   flex-shrink: 0;
 }
-
 .race-grade-tag {
   font-family: "Quicksand", sans-serif;
   font-weight: 700;
@@ -749,7 +646,6 @@ body.light .chip:hover {
   border: none;
   flex-shrink: 0;
 }
-
 .mini-tag {
   font-family: "Quicksand", sans-serif;
   font-weight: 700;
@@ -759,16 +655,12 @@ body.light .chip:hover {
   color: #12141a;
   white-space: nowrap;
 }
-
 .trophy-date {
   font-size: 10px;
   font-weight: 500;
   color: var(--ink-faint);
   white-space: nowrap;
 }
-
-/* Trainee icon placeholder — drop images in an /icons folder named
-   after the trainee (e.g. icons/special-week.png) to fill these in. */
 .trainee-icon {
   width: var(--icon-size, 32px);
   height: var(--icon-size, 32px);
@@ -782,14 +674,12 @@ body.light .chip:hover {
   align-items: center;
   justify-content: center;
 }
-
 .trainee-icon img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
-
 .trainee-icon .icon-fallback {
   display: none;
   align-items: center;
@@ -801,7 +691,6 @@ body.light .chip:hover {
   font-size: calc(var(--icon-size, 32px) * 0.4);
   color: var(--ink-faint);
 }
-
 #tooltip {
   position: fixed;
   z-index: 1000;
@@ -821,19 +710,16 @@ body.light .chip:hover {
   transition: opacity .1s ease, transform .1s ease;
   border-top: 3px solid var(--accent);
 }
-
 #tooltip.show {
   opacity: 1;
   transform: translateY(0);
 }
-
 #tooltip .tt-head {
   font-family: "Quicksand", sans-serif;
   font-weight: 700;
   font-size: 13px;
   margin-bottom: 3px;
 }
-
 #tooltip .tt-stat {
   font-family: "Quicksand", sans-serif;
   font-size: 10px;
@@ -841,14 +727,12 @@ body.light .chip:hover {
   color: var(--ink-dim);
   margin-bottom: 6px;
 }
-
 #tooltip .tt-variant {
   margin-top: 6px;
   padding-top: 6px;
   border-top: 1px solid var(--line);
   color: var(--accent2);
 }
-
 footer {
   text-align: center;
   font-size: 11px;
@@ -858,14 +742,11 @@ footer {
   font-weight: 500;
   line-height: 1.7;
 }
-
-/* ===== Inline calendar (per My List card) ===== */
 .inline-cal {
   border-top: 1px solid var(--line-soft);
   margin-top: 12px;
   padding-top: 10px;
 }
-
 .inline-cal-toggle {
   background: none;
   border: none;
@@ -879,28 +760,16 @@ footer {
   align-items: center;
   gap: 6px;
 }
-
 .inline-cal-toggle:hover {
   color: var(--accent2);
 }
-
 .inline-cal-body {
   display: none;
   margin-top: 10px;
 }
-
 .inline-cal-body.open {
   display: block;
 }
-
-/* ===== Full Calendar View ===== */
-/* Calendar View needs more horizontal room than the 1080px .wrap gives the
-   rest of the site, so it breaks out to the full viewport width and centers
-   itself independently instead of inheriting .wrap's narrower column. */
-/* No longer needs a vw-based breakout hack — calendar-view lives outside
-   .wrap in the markup now, so it's naturally full-width without relying on
-   100vw, which can mismatch the true visible viewport on some mobile
-   browsers (notably foldables with dynamic/collapsing toolbars). */
 .calendar-layout {
   display: flex;
   align-items: flex-start;
@@ -909,7 +778,6 @@ footer {
   margin: 20px auto;
   padding: 0 18px;
 }
-
 .cal-sidebar {
   width: 260px;
   flex-shrink: 0;
@@ -920,16 +788,9 @@ footer {
   top: 20px;
   z-index: 40;
 }
-
-/* Elevated above the topbar only while the trainee-switcher dropdown is
-   open — keeps the sidebar's baseline z-index modest the rest of the time,
-   so it never permanently buries whatever's open inside the topbar (like
-   the settings panel). Safe because the two popovers are mutually
-   exclusive — only one is ever open at a time. */
 .cal-sidebar.panel-open {
   z-index: 97;
 }
-
 .cal-trainee-box {
   background: var(--glass-bg-soft);
   backdrop-filter: blur(8px);
@@ -945,13 +806,11 @@ footer {
   box-shadow: var(--glass-highlight);
   position: relative;
 }
-
 .cal-trainee-name {
   font-family: "Quicksand", sans-serif;
   font-weight: 700;
   font-size: 18px;
 }
-
 .cal-tool-box {
   background: var(--glass-bg-soft);
   backdrop-filter: blur(8px);
@@ -961,7 +820,6 @@ footer {
   padding: 14px 16px;
   box-shadow: var(--glass-highlight);
 }
-
 .cal-tool-box-title {
   font-family: "Quicksand", sans-serif;
   font-weight: 700;
@@ -971,30 +829,25 @@ footer {
   color: var(--ink-dim);
   margin-bottom: 10px;
 }
-
 .cal-tool-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-
 .cal-tool-list .btn {
   width: 100%;
   text-align: center;
 }
-
 .cal-main {
   flex: 1;
   min-width: 0;
 }
-
 .cal-tabs {
   display: flex;
   gap: 6px;
   margin-bottom: 14px;
   flex-wrap: wrap;
 }
-
 .cal-tab-btn {
   font-family: "Quicksand", sans-serif;
   font-weight: 600;
@@ -1007,25 +860,21 @@ footer {
   cursor: pointer;
   transition: box-shadow .15s ease, border-color .15s ease, color .15s ease;
 }
-
 .cal-tab-btn:hover {
   color: var(--accent2);
   border-color: var(--accent-dim);
 }
-
 .cal-tab-btn.active {
   background: var(--accent);
   color: #12141a;
   border-color: var(--accent);
   box-shadow: 0 0 12px rgba(var(--accent-rgb), .4);
 }
-
 .cal-grid-46 {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
 }
-
 .cal-cell-label {
   font-family: "Quicksand", sans-serif;
   font-weight: 700;
@@ -1035,7 +884,6 @@ footer {
   color: var(--ink-faint);
   margin-bottom: 2px;
 }
-
 .cal-cell {
   border: 1px solid var(--glass-border);
   border-radius: 10px;
@@ -1047,13 +895,11 @@ footer {
   min-height: 64px;
   transition: border-color .12s ease, background .12s ease;
 }
-
 .cal-cell-empty {
   background: transparent;
   border-style: dashed;
   opacity: .55;
 }
-
 .cal-race-row {
   display: flex;
   align-items: center;
@@ -1063,34 +909,28 @@ footer {
   border-radius: 6px;
   padding: 3px 2px;
 }
-
 .cal-race-row[draggable="true"] {
   cursor: grab;
 }
-
 .cal-race-row.dragging {
   opacity: .4;
 }
-
 .cal-race-row.drag-over {
   background: rgba(var(--accent-rgb), .18);
   box-shadow: inset 0 0 0 1px var(--accent-dim);
 }
-
 .drag-handle {
   color: var(--ink-faint);
   font-size: 11px;
   flex-shrink: 0;
   line-height: 1;
 }
-
 .cal-race-row input[type=checkbox] {
   accent-color: var(--accent);
   width: 13px;
   height: 13px;
   flex-shrink: 0;
 }
-
 .cal-grade-tag {
   font-family: "Quicksand", sans-serif;
   font-weight: 700;
@@ -1100,7 +940,6 @@ footer {
   color: #12141a;
   flex-shrink: 0;
 }
-
 .cal-race-info {
   flex: 1;
   min-width: 0;
@@ -1109,7 +948,6 @@ footer {
   align-items: flex-start;
   gap: 0;
 }
-
 .cal-race-name {
   min-width: 0;
   overflow: hidden;
@@ -1117,13 +955,11 @@ footer {
   white-space: nowrap;
   max-width: 100%;
 }
-
 .cal-race-sub {
   font-size: 9px;
   font-weight: 500;
   color: var(--ink-faint);
 }
-
 .cal-done-divider {
   border-top: 1px dashed var(--line);
   margin-top: 4px;
@@ -1132,31 +968,20 @@ footer {
   flex-direction: column;
   gap: 4px;
 }
-
 .cal-race-row.done {
   opacity: .5;
 }
-
 .cal-race-row.done .cal-race-name {
   text-decoration: line-through;
 }
-
 .cal-oob-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-
-/* Trainee switcher panel */
-/* backdrop-filter alone creates a stacking context (even without z-index),
-   so cal-trainee-box and cal-tool-box — plain siblings, neither with an
-   explicit z-index — tie at that implicit level and fall back to DOM order,
-   where cal-tool-box (rendered after) wins and buries the dropdown. This
-   explicit z-index breaks that tie only while the dropdown is open. */
 .cal-trainee-box.panel-open {
   z-index: 10;
 }
-
 .cal-trainee-name-btn {
   background: none;
   border: none;
@@ -1167,11 +992,9 @@ footer {
   padding: 0;
   color: var(--ink);
 }
-
 .cal-trainee-name-btn:hover .cal-trainee-name {
   color: var(--accent2);
 }
-
 .cal-trainee-arrow {
   display: inline-flex;
   align-items: center;
@@ -1185,32 +1008,27 @@ footer {
   color: var(--ink-faint);
   transition: transform .25s cubic-bezier(.4, 0, .2, 1), background .15s ease, border-color .15s ease, color .15s ease;
 }
-
 .cal-trainee-arrow svg {
   width: 14px;
   height: 14px;
   display: block;
 }
-
 .cal-trainee-name-btn:hover .cal-trainee-arrow,
 .inline-cal-toggle:hover .cal-trainee-arrow {
   border-color: var(--accent-dim);
   color: var(--accent2);
 }
-
 .cal-trainee-arrow.open {
   transform: rotate(180deg);
   background: var(--accent);
   border-color: var(--accent);
   color: #12141a;
 }
-
 .cal-trainee-name-btn:hover .cal-trainee-arrow.open,
 .inline-cal-toggle:hover .cal-trainee-arrow.open {
   border-color: var(--accent-dim);
   color: #12141a;
 }
-
 .cal-trainee-panel {
   position: absolute;
   top: 100%;
@@ -1232,24 +1050,20 @@ footer {
   pointer-events: none;
   transition: opacity .25s cubic-bezier(.4, 0, .2, 1), transform .25s cubic-bezier(.4, 0, .2, 1);
 }
-
 .cal-trainee-panel.open {
   opacity: 1;
   transform: translateY(0) scale(1);
   pointer-events: auto;
 }
-
 .cal-trainee-panel .search {
   width: 100%;
   margin-bottom: 8px;
 }
-
 .cal-trainee-sort {
   display: flex;
   gap: 6px;
   margin-bottom: 10px;
 }
-
 .sort-btn {
   font-family: "Quicksand", sans-serif;
   font-weight: 600;
@@ -1261,13 +1075,11 @@ footer {
   color: var(--ink-dim);
   cursor: pointer;
 }
-
 .sort-btn.active {
   background: var(--accent);
   color: #12141a;
   border-color: var(--accent);
 }
-
 .cal-trainee-group-label {
   font-family: "Quicksand", sans-serif;
   font-weight: 700;
@@ -1277,7 +1089,6 @@ footer {
   color: var(--ink-faint);
   margin: 8px 0 4px;
 }
-
 .cal-trainee-list {
   display: flex;
   flex-direction: column;
@@ -1285,7 +1096,6 @@ footer {
   max-height: 160px;
   overflow-y: auto;
 }
-
 .cal-trainee-row {
   display: flex;
   align-items: center;
@@ -1296,15 +1106,12 @@ footer {
   font-size: 12.5px;
   font-weight: 500;
 }
-
 .cal-trainee-row:hover {
   background: var(--panel);
 }
-
 .cal-trainee-row.active {
   background: rgba(var(--accent-rgb), .15);
 }
-
 .cal-trainee-row-name {
   flex: 1;
   min-width: 0;
@@ -1312,7 +1119,6 @@ footer {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .cal-trainee-current {
   font-family: "Quicksand", sans-serif;
   font-weight: 700;
@@ -1321,7 +1127,6 @@ footer {
   text-transform: uppercase;
   letter-spacing: .04em;
 }
-
 .cal-trainee-remove {
   background: none;
   border: none;
@@ -1332,12 +1137,9 @@ footer {
   padding: 2px 4px;
   flex-shrink: 0;
 }
-
 .cal-trainee-remove:hover {
   color: var(--f);
 }
-
-/* About modal — lightweight: plain overlay color (no blur), simple show/hide via class toggle */
 .modal-overlay {
   display: none;
   position: fixed;
@@ -1348,11 +1150,9 @@ footer {
   justify-content: center;
   padding: 20px;
 }
-
 .modal-overlay.show {
   display: flex;
 }
-
 .modal-box {
   background: var(--glass-bg);
   backdrop-filter: blur(10px);
@@ -1367,21 +1167,18 @@ footer {
   box-shadow: var(--glass-highlight), 0 20px 50px rgba(0, 0, 0, .5), 0 0 20px rgba(var(--accent-rgb), .12);
   contain: paint;
 }
-
 .modal-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
 }
-
 .modal-title {
   font-family: "Quicksand", sans-serif;
   font-weight: 700;
   font-size: 16px;
   color: var(--ink);
 }
-
 .modal-close {
   background: var(--panel-2);
   border: 1px solid var(--line);
@@ -1392,16 +1189,13 @@ footer {
   cursor: pointer;
   font-size: 13px;
 }
-
 .modal-close:hover {
   color: var(--ink);
   border-color: var(--accent-dim);
 }
-
 .settings-about-btn {
   width: 100%;
 }
-
 .version-badge {
   display: inline-block;
   font-family: "Quicksand", sans-serif;
@@ -1415,41 +1209,30 @@ footer {
   padding: 3px 10px;
   margin-bottom: 12px;
 }
-
-/* Calendar View: blank placeholder icon shown when My List is empty */
 .trainee-icon-blank {
   background: #ffffff;
 }
-
-/* Calendar View: greyed-out, non-interactive grid shown when My List is empty */
 .cal-disabled {
   opacity: .4;
   filter: grayscale(65%);
   pointer-events: none;
   user-select: none;
 }
-
-/* Race locator (sidebar "Find a race" box) */
 .cal-locate-wrap {
   position: relative;
 }
-
-/* Brief, lightweight highlight when a searched race is located in the grid */
 .cal-cell-flash {
   box-shadow: 0 0 0 2px var(--accent), 0 0 14px 2px rgba(var(--accent-rgb), .5);
   transition: box-shadow .3s ease;
 }
-
 #db-sort {
   margin-bottom: 0;
 }
-
 .cal-trainee-empty {
   font-size: 12px;
   color: var(--ink-faint);
   padding: 6px;
 }
-
 .about-text p {
   font-size: 12.5px;
   font-weight: 500;
@@ -1457,22 +1240,18 @@ footer {
   line-height: 1.7;
   margin: 0 0 10px;
 }
-
 .about-text p:last-child {
   margin-bottom: 0;
 }
-
 .about-text a {
   color: var(--accent2);
   text-decoration: underline;
   text-underline-offset: 2px;
   font-weight: 600;
 }
-
 .about-text a:hover {
   color: var(--accent);
 }
-
 @media (max-width: 720px) {
   .calendar-layout {
     flex-direction: column;
@@ -1485,9 +1264,6 @@ footer {
     grid-template-columns: repeat(2, 1fr);
   }
 }
-
-/* ===== Light mode: skeuomorphic depth + readability fixes ===== */
-
 body.light .btn {
   box-shadow: 0 2px 4px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.65);
   color: var(--ink);
@@ -1509,7 +1285,6 @@ body.light .btn.ghost {
 body.light .icon-btn {
   padding: 8px 14px;
 }
-
 body.light .db-card,
 body.light .mycard,
 body.light .cal-trainee-box,
@@ -1522,17 +1297,14 @@ body.light .mycard:hover {
   box-shadow: 0 6px 16px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.8);
   transform: translateY(-1px);
 }
-
 body.light .db-num {
   color: var(--ink-dim);
   background: var(--line-soft);
   box-shadow: inset 0 1px 2px rgba(0,0,0,.08);
 }
-
 body.light .gate-badge {
   box-shadow: 0 2px 4px rgba(0,0,0,.1), inset 0 1px 0 rgba(255,255,255,.7);
 }
-
 body.light .search {
   box-shadow: inset 0 2px 4px rgba(0,0,0,.07), 0 1px 0 rgba(255,255,255,.55);
   background: var(--bg);
@@ -1541,22 +1313,18 @@ body.light .search:focus {
   border-color: var(--accent-dim);
   box-shadow: inset 0 2px 4px rgba(0,0,0,.07), 0 0 0 3px rgba(139,123,255,.12);
 }
-
 body.light .settings-panel {
   box-shadow: 0 8px 24px rgba(0,0,0,.18);
 }
-
 body.light .race-suggest {
   box-shadow: 0 6px 20px rgba(0,0,0,.14);
 }
-
 body.light .cal-cell {
   box-shadow: inset 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
 }
 body.light .cal-cell-empty {
   box-shadow: none;
 }
-
 body.light .cal-tab-btn {
   background: var(--panel);
   color: var(--ink);
@@ -1572,16 +1340,13 @@ body.light .cal-tab-btn.active {
   box-shadow: inset 0 1px 3px rgba(0,0,0,.15);
   color: #ffffff;
 }
-
 body.light .cal-trainee-arrow.open {
   color: #ffffff;
 }
-
 body.light .cal-trainee-name-btn:hover .cal-trainee-arrow.open,
 body.light .inline-cal-toggle:hover .cal-trainee-arrow.open {
   color: #ffffff;
 }
-
 body.light .sort-btn {
   background: var(--panel);
   color: var(--ink);
@@ -1597,55 +1362,44 @@ body.light .sort-btn.active {
   box-shadow: inset 0 1px 3px rgba(0,0,0,.15);
   color: #ffffff;
 }
-
 body.light .progress-track {
   box-shadow: inset 0 1px 3px rgba(0,0,0,.1);
   border-color: var(--line);
 }
-
 body.light .switch-slider {
   box-shadow: inset 0 1px 3px rgba(0,0,0,.1), 0 1px 0 rgba(255,255,255,.5);
 }
 body.light .switch input:checked + .switch-slider {
   box-shadow: inset 0 1px 2px rgba(0,0,0,.08);
 }
-
 body.light .empty-note {
   border-color: var(--line);
   color: var(--ink-dim);
 }
-
 body.light #tooltip {
   box-shadow: 0 6px 20px rgba(0,0,0,.2);
 }
-
 body.light .modal-box {
   box-shadow: 0 12px 40px rgba(0,0,0,.2);
 }
-
 body.light .cal-trainee-panel {
   box-shadow: 0 8px 24px rgba(0,0,0,.18);
 }
-
 body.light .add-trophy input {
   box-shadow: inset 0 2px 4px rgba(0,0,0,.07);
   background: var(--bg);
 }
-
 body.light .trophy-date,
 body.light .race-date {
   color: var(--ink-dim);
 }
-
 body.light .trainee-icon-blank {
   background: var(--line-soft);
   box-shadow: inset 0 1px 3px rgba(0,0,0,.08);
 }
-
 body.light .modal-overlay {
   background: rgba(0,0,0,.22);
 }
-
 body.light .cal-trainee-row.active {
   background: rgba(139,123,255,.12);
 }

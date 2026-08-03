@@ -1,11 +1,7 @@
-// App bootstrap: settings panel, About modal, and the standard-view /
-// Calendar-View dispatcher that both other modules call into.
-
 import { state, loadState, saveState } from './core.js';
 import { renderDatabase, renderMyList, addCustom, wireStandardViewControls } from './standard-view.js';
 import { renderCalendarView, closeCalTraineePanel } from './calendar.js';
 
-// Shows either the standard Database + My List layout, or the optional Calendar View.
 export function renderMainView() {
   const standard = document.getElementById('standard-view');
   const calView = document.getElementById('calendar-view');
@@ -30,8 +26,6 @@ export function applySettingsUI() {
   const calViewToggle = document.getElementById('toggle-calendar-view');
   const trainRow = document.getElementById('custom-trainee-row');
 
-  // Custom trophies can't be turned off when race search itself is off — with
-  // no search, every trophy typed is inherently a custom one.
   if (!state.settings.allowRaceSearch) state.settings.allowCustomTrophies = true;
 
   document.body.classList.toggle('light', !!state.settings.lightMode);
@@ -119,7 +113,7 @@ async function init() {
     saveState(); applySettingsUI(); renderMainView();
   });
   if (trophyToggle) trophyToggle.addEventListener('change', () => {
-    if (!state.settings.allowRaceSearch) return; // locked on while race search is off
+    if (!state.settings.allowRaceSearch) return;
     state.settings.allowCustomTrophies = trophyToggle.checked;
     saveState(); applySettingsUI(); renderMainView();
   });

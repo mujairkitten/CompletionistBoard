@@ -1,5 +1,3 @@
-// One entry per character, consolidated across all Global costumes.
-// Where costumes disagree, the value is {base, alt, note}.
 export const DATABASE = [
   { name: "Special Week", apt: { turf: "A", dirt: "G", sprint: "F", mile: "C", medium: "A", long: "A" } },
   { name: "El Condor Pasa", apt: { turf: "A", dirt: "B", sprint: "F", mile: "A", medium: "A", long: "B" } },

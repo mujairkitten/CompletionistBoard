@@ -1,6 +1,3 @@
-// Trainee Database + My List (the default, non-Calendar-View layout) — plus
-// all trophy/trainee CRUD, since both views trigger the same mutations.
-
 import { DATABASE } from './data/database.js';
 import { RACES, TRACK_TO_APT_KEY, DIST_TO_APT_KEY } from './data/races.js';
 import {
@@ -9,10 +6,8 @@ import {
 } from './core.js';
 import { calPageHtml, wireCalPage, calGradeColor, CAL_YEAR_GROUPS } from './calendar.js';
 
-export let dbSort = "default"; // default | az | za
+export let dbSort = "default";
 
-// Runtime-only UI state (not persisted): which My List cards have their inline
-// calendar open, and which tab each currently shows.
 const openInlineCals = new Set();
 const inlineCalTab = {};
 
@@ -24,9 +19,6 @@ export function renderDatabase() {
   document.getElementById('db-gate').textContent = DATABASE.length;
 
   const addedNames = new Set(state.myList.map(t => t.name.toLowerCase()));
-  // Trainee names are unique (one entry per character), so this is a safe,
-  // O(1)-lookup stand-in for DATABASE.indexOf(d) — avoids an O(n) scan per
-  // rendered card (O(n²) overall) on every keystroke in the search box.
   const indexByName = new Map(DATABASE.map((d, i) => [d.name, i]));
 
   grid.innerHTML = list.map((d) => {
@@ -106,7 +98,6 @@ export function renderMyList() {
           renderRaceSuggestions(t, addTInput.value, suggestBox, addTInput);
         });
         addTInput.addEventListener('blur', () => {
-          // Delay so a click on a suggestion registers before the box hides.
           setTimeout(() => hideSuggestBox(suggestBox), 150);
         });
       }
@@ -189,7 +180,7 @@ function renderRaceSuggestions(trainee, query, box, inputEl) {
 
   box.querySelectorAll('.race-suggest-item').forEach(item => {
     item.addEventListener('mousedown', (e) => {
-      e.preventDefault(); // keep focus so blur doesn't fire before click
+      e.preventDefault();
       const race = findRaceByExactName(item.dataset.race);
       if (race) {
         addTrophy(trainee.id, race.name, raceMeta(race));
@@ -288,7 +279,7 @@ function myCardHtml(t) {
       </div>
       <div class="trophy-list">${trophyHtml}</div>
       <div class="add-trophy">
-        <input type="text" id="addt-input-${t.id}" placeholder="${!state.settings.allowRaceSearch ? 'Add a custom trophy' : (state.settings.allowCustomTrophies ? 'Search races (G1–G3) or type a custom trophy' : 'Search races (G1–G3)')}" autocomplete="off">
+        <input type="text" id="addt-input-${t.id}" placeholder="${!state.settings.allowRaceSearch ? 'Add a custom trophy' : (state.settings.allowCustomTrophies ? 'Search races (G1-G3) or type a custom trophy' : 'Search races (G1-G3)')}" autocomplete="off">
         <button class="btn small" id="addt-btn-${t.id}">+ Add</button>
         ${state.settings.allowRaceSearch ? `<div class="race-suggest" id="addt-suggest-${t.id}"></div>` : ""}
       </div>
@@ -364,8 +355,6 @@ export function importList(file) {
   reader.readAsText(file);
 }
 
-// Wires the Trainee Database's search box, sort buttons, custom-trainee row,
-// and the top-bar Export/Import buttons. Called once from main.js on init.
 export function wireStandardViewControls() {
   document.getElementById('db-search').addEventListener('input', renderDatabase);
   document.getElementById('custom-add-btn').addEventListener('click', addCustom);

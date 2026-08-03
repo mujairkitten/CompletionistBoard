@@ -1,5 +1,3 @@
-// Official race calendar (G1/G2/G3), sourced from the user's Races.xlsx.
-// Used to power the searchable trophy picker on each My List card.
 export const RACES = [
   {grade:'G1',year:'Senior',month:'February',turn:'Late',name:'February Stakes',track:'Dirt',distance:'Mile'},
   {grade:'G1',year:'Senior',month:'March',turn:'Late',name:'Takamatsunomiya Kinen',track:'Turf',distance:'Sprint'},
@@ -155,6 +153,5 @@ export const RACES = [
   {grade:'G3',year:'Classic, Senior',month:'August',turn:'Late',name:'Cluster Cup',track:'Dirt',distance:'Sprint'},
 ];
 
-// Maps a race's Track/Distance text (as given in the spreadsheet) to the aptitude keys used above.
 export const TRACK_TO_APT_KEY = { Turf: "turf", Dirt: "dirt" };
 export const DIST_TO_APT_KEY = { Sprint: "sprint", Mile: "mile", Medium: "medium", Long: "long" };
