@@ -1,3 +1,5 @@
+import { RACES } from './data/races.js';
+
 export const GRADES = ["A", "B", "C", "D", "E", "F", "G"];
 export const GRADE_INFO = {
   A: { pct: "100%", tip: "Baseline. No penalty, safe to race here.", tier: "a" },
@@ -19,9 +21,13 @@ export const CATS = [
 export const SURFACE_KEYS = ["turf", "dirt"];
 export const DISTANCE_KEYS = ["sprint", "mile", "medium", "long"];
 
-export let state = {
-  myList: [],
-  settings: {
+const SAFE_ID = /^[a-z0-9]{7}$/;
+const MAX_NAME_LENGTH = 120;
+const MAX_NOTE_LENGTH = 500;
+const MAX_TROPHIES_PER_TRAINEE = 300;
+
+function defaultSettings() {
+  return {
     allowCustomTrainees: true,
     allowRaceSearch: true,
     allowCustomTrophies: true,
@@ -29,42 +35,186 @@ export let state = {
     lightMode: false,
     colorTheme: 'turf',
     activeTraineeId: null
-  }
+  };
+}
+
+export let state = {
+  myList: [],
+  settings: defaultSettings()
 };
 
+let saveQueue = Promise.resolve();
+
 export function uid() { return Math.random().toString(36).slice(2, 9); }
+
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function safeText(value, maxLength) {
+  return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
+}
+
+function nextId(usedIds) {
+  let id;
+  do { id = uid(); } while (usedIds.has(id));
+  usedIds.add(id);
+  return id;
+}
+
+function normalizedId(value, usedIds) {
+  if (typeof value === 'string' && SAFE_ID.test(value) && !usedIds.has(value)) {
+    usedIds.add(value);
+    return value;
+  }
+  return nextId(usedIds);
+}
+
+function normalizeAptitude(value) {
+  if (typeof value === 'string') return GRADE_INFO[value] ? value : null;
+  if (!isPlainObject(value) || !GRADE_INFO[value.base] || !GRADE_INFO[value.alt]) return null;
+  return {
+    base: value.base,
+    alt: value.alt,
+    note: safeText(value.note, MAX_NOTE_LENGTH)
+  };
+}
+
+function normalizeAptitudes(value) {
+  if (!isPlainObject(value)) return null;
+  const aptitudes = {};
+  for (const { key } of CATS) {
+    const aptitude = normalizeAptitude(value[key]);
+    if (!aptitude) return null;
+    aptitudes[key] = aptitude;
+  }
+  return aptitudes;
+}
+
+function normalizeTrophy(value, usedIds) {
+  if (!isPlainObject(value)) return null;
+  const name = safeText(value.name, MAX_NAME_LENGTH);
+  if (!name) return null;
+  const trophy = {
+    id: normalizedId(value.id, usedIds),
+    name,
+    checked: value.checked === true
+  };
+  const race = RACES.find(item => item.name.toLowerCase() === name.toLowerCase());
+  if (race) {
+    trophy.grade = race.grade;
+    trophy.track = race.track;
+    trophy.distance = race.distance;
+    trophy.year = race.year;
+    trophy.turn = race.turn;
+    trophy.month = race.month;
+  }
+  return trophy;
+}
+
+function normalizeCalendarOrder(value) {
+  if (!isPlainObject(value)) return {};
+  const validRaceNames = new Set(RACES.map(race => race.name));
+  const order = {};
+  for (const [slotKey, names] of Object.entries(value)) {
+    if (!Array.isArray(names) || !/^[A-Z][a-z]+\|(Early|Late)$/.test(slotKey)) continue;
+    order[slotKey] = names
+      .filter(name => typeof name === 'string' && validRaceNames.has(name))
+      .slice(0, RACES.length);
+  }
+  return order;
+}
+
+function normalizeTrainee(value, usedTraineeIds) {
+  if (!isPlainObject(value)) return null;
+  const name = safeText(value.name, MAX_NAME_LENGTH);
+  const aptitudes = normalizeAptitudes(value.aptitudes);
+  if (!name || !aptitudes) return null;
+
+  const usedTrophyIds = new Set();
+  const trophies = Array.isArray(value.trophies)
+    ? value.trophies.slice(0, MAX_TROPHIES_PER_TRAINEE)
+      .map(trophy => normalizeTrophy(trophy, usedTrophyIds))
+      .filter(Boolean)
+    : [];
+
+  return {
+    id: normalizedId(value.id, usedTraineeIds),
+    name,
+    aptitudes,
+    trophies,
+    calendarOrder: normalizeCalendarOrder(value.calendarOrder)
+  };
+}
+
+function normalizeSettings(value, trainees) {
+  const raw = isPlainObject(value) ? value : {};
+  const settings = defaultSettings();
+  for (const key of ['allowCustomTrainees', 'allowRaceSearch', 'allowCustomTrophies', 'calendarViewMode', 'lightMode']) {
+    if (typeof raw[key] === 'boolean') settings[key] = raw[key];
+  }
+  settings.colorTheme = raw.colorTheme === 'dirt' ? 'dirt' : 'turf';
+  if (!settings.allowRaceSearch) settings.allowCustomTrophies = true;
+  if (typeof raw.activeTraineeId === 'string' && trainees.some(t => t.id === raw.activeTraineeId)) {
+    settings.activeTraineeId = raw.activeTraineeId;
+  }
+  return settings;
+}
+
+function normalizeTraineeList(value, usedTraineeIds = new Set()) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(trainee => normalizeTrainee(trainee, usedTraineeIds))
+    .filter(Boolean);
+}
+
+export function normalizeImportedTrainees(value, existingTrainees = []) {
+  const usedTraineeIds = new Set(
+    Array.isArray(existingTrainees) ? existingTrainees.map(t => t.id).filter(id => SAFE_ID.test(id)) : []
+  );
+  return normalizeTraineeList(value, usedTraineeIds);
+}
+
+function normalizeState(value) {
+  const raw = isPlainObject(value) ? value : {};
+  const myList = normalizeTraineeList(raw.myList);
+  return { myList, settings: normalizeSettings(raw.settings, myList) };
+}
 
 export async function loadState() {
   try {
     if (window.storage && typeof window.storage.get === 'function') {
       const res = await window.storage.get('mylist', false);
-      if (res && res.value) { state = JSON.parse(res.value); }
+      if (res && res.value) { state = normalizeState(JSON.parse(res.value)); }
     } else {
       const val = localStorage.getItem('mylist');
-      if (val) { state = JSON.parse(val); }
+      if (val) { state = normalizeState(JSON.parse(val)); }
     }
   } catch (e) { console.error("Storage load failed", e); }
-  if (!state.settings) {
-    state.settings = { allowCustomTrainees: true, allowCustomTrophies: true };
-  }
-  if (state.settings.calendarViewMode === undefined) state.settings.calendarViewMode = false;
-  if (state.settings.lightMode === undefined) state.settings.lightMode = false;
-  if (state.settings.colorTheme === undefined) state.settings.colorTheme = 'turf';
-  if (state.settings.activeTraineeId === undefined) state.settings.activeTraineeId = null;
-  if (state.settings.allowRaceSearch === undefined) state.settings.allowRaceSearch = true;
-  if (!state.settings.allowRaceSearch) state.settings.allowCustomTrophies = true;
-  delete state.settings.inlineCalendar;
+  state = normalizeState(state);
 }
 
-export async function saveState() {
+export function saveState() {
+  let snapshot;
   try {
-    if (window.storage && typeof window.storage.set === 'function') {
-      await window.storage.set('mylist', JSON.stringify(state), false);
-    } else {
-      localStorage.setItem('mylist', JSON.stringify(state));
-    }
+    snapshot = JSON.stringify(state);
+  } catch (e) {
+    console.error("Storage serialization failed", e);
+    return Promise.resolve();
   }
-  catch (e) { console.error("Storage save failed", e); }
+
+  saveQueue = saveQueue.catch(() => {}).then(async () => {
+    try {
+      if (window.storage && typeof window.storage.set === 'function') {
+        await window.storage.set('mylist', snapshot, false);
+      } else {
+        localStorage.setItem('mylist', snapshot);
+      }
+    } catch (e) {
+      console.error("Storage save failed", e);
+    }
+  });
+  return saveQueue;
 }
 
 export function escapeHtml(str) {
@@ -130,6 +280,13 @@ export function aptGroupsHtml(apt) {
   </div>`;
 }
 export function wireChips(root) {
+  root.querySelectorAll('.trainee-icon img').forEach(img => {
+    img.addEventListener('error', () => {
+      img.style.display = 'none';
+      const fallback = img.nextElementSibling;
+      if (fallback) fallback.style.display = 'flex';
+    });
+  });
   root.querySelectorAll('.chip').forEach(p => {
     const value = JSON.parse(p.dataset.json);
     p.addEventListener('mouseenter', () => showTooltip(p, p.dataset.cat, value));
@@ -146,7 +303,7 @@ export function iconHtml(name, size) {
   const slug = slugify(name);
   const initial = (name.trim()[0] || '?').toUpperCase();
   return `<div class="trainee-icon" style="--icon-size:${size}px">
-    <img src="icons/${slug}.png" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+    <img src="icons/${slug}.png" alt="" loading="lazy">
     <span class="icon-fallback">${initial}</span>
   </div>`;
 }

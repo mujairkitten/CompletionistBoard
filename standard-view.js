@@ -1,7 +1,7 @@
 import { DATABASE } from './data/database.js';
 import { RACES, TRACK_TO_APT_KEY, DIST_TO_APT_KEY } from './data/races.js';
 import {
-  state, saveState, uid, escapeHtml, gradeOf, GRADE_INFO,
+  state, saveState, uid, escapeHtml, gradeOf, GRADE_INFO, normalizeImportedTrainees,
   aptGroupsHtml, wireChips, iconHtml, weakAptitudes, sortRowsByMode, raceDateLabel
 } from './core.js';
 import { calPageHtml, wireCalPage, calGradeColor, CAL_YEAR_GROUPS } from './calendar.js';
@@ -342,12 +342,18 @@ export function importList(file) {
     try {
       const parsed = JSON.parse(reader.result);
       if (!parsed || !Array.isArray(parsed.myList)) throw new Error("bad format");
-      const existingIds = new Set(state.myList.map(t => t.id));
-      parsed.myList.forEach(t => {
-        if (!t.id || existingIds.has(t.id)) t.id = uid();
-        state.myList.push(t);
+      const knownNames = new Set(state.myList.map(trainee => trainee.name.toLocaleLowerCase()));
+      const trainees = normalizeImportedTrainees(parsed.myList, state.myList).filter(trainee => {
+        const key = trainee.name.toLocaleLowerCase();
+        if (knownNames.has(key)) return false;
+        knownNames.add(key);
+        return true;
       });
+      state.myList.push(...trainees);
       saveState(); renderMyList(); renderDatabase();
+      if (trainees.length !== parsed.myList.length) {
+        alert(`Imported ${trainees.length} trainee${trainees.length === 1 ? '' : 's'}. Duplicate or invalid entries were skipped.`);
+      }
     } catch (e) {
       alert("Couldn't read that file — expected a Completionist Board export.");
     }
