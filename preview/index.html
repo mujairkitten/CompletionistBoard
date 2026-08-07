@@ -19,9 +19,7 @@
       <h1>Completionist Board</h1>
     </div>
     <div class="topbar-actions">
-      <button class="btn" id="export-btn">Export list</button>
-      <label class="btn" for="import-file">Import list</label>
-      <input type="file" id="import-file" accept=".json">
+      <button class="btn" id="backup-btn">Backup</button>
       <div class="settings-wrap">
         <button class="btn icon-btn" id="settings-btn" aria-label="Settings" title="Settings">⚙</button>
         <div class="settings-panel" id="settings-panel">
@@ -130,12 +128,37 @@
       <span class="modal-title">About</span>
       <button class="modal-close" id="about-close" aria-label="Close">✕</button>
     </div>
-    <div class="version-badge">v4.0-prev1</div>
+    <div class="version-badge">v4.0-prev2</div>
     <div class="about-text">
       <p>Character aptitudes consolidated from the Umamusume Wiki trainee tables across all Global costumes. Latest database update: August 1, 2026 (Aston Machan).</p>
       <p>Race calendar sourced from a 152-race G1-G3 dataset. Out-of-Bond holds custom (non-race) trophies, which have no fixed date.</p>
-      <p>Calendar View is an optional toggle. Your list is stored privately in this browser — use Export/Import to move it between sessions or devices.</p>
+      <p>Calendar View is an optional toggle. Your list is stored privately in this browser — use Backup to move it between sessions or devices.</p>
       <p>2026, Mujairkitten. Made with various AI tools. Not affiliated with Cygames. Source code is licensed under GPL-3. Uma icons are subject to Cygames, used fairly according to <a href="https://umamusume.com/fan-createdguide">Cygames' Fan Content Guide.</a></p>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="backup-overlay">
+  <div class="modal-box" id="backup-modal">
+    <div class="modal-head">
+      <span class="modal-title">Backup</span>
+      <button class="modal-close" id="backup-close" aria-label="Close">✕</button>
+    </div>
+    <div class="cal-tabs" id="backup-tabs">
+      <button class="cal-tab-btn active" data-tab="export">Export</button>
+      <button class="cal-tab-btn" data-tab="import">Import</button>
+    </div>
+    <div id="backup-export-panel">
+      <textarea class="backup-textarea" id="backup-export-text" readonly spellcheck="false"></textarea>
+      <button class="btn small" id="backup-export-file-btn">Export file</button>
+    </div>
+    <div id="backup-import-panel" style="display:none;">
+      <textarea class="backup-textarea" id="backup-import-text" placeholder="Paste your exported JSON here…" spellcheck="false"></textarea>
+      <div class="backup-import-actions">
+        <button class="btn small" id="backup-import-text-btn">Import pasted list</button>
+        <label class="btn small" for="backup-import-file">Import from file</label>
+        <input type="file" id="backup-import-file" accept=".json">
+      </div>
     </div>
   </div>
 </div>

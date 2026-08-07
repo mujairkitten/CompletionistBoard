@@ -4,8 +4,12 @@ import {
   state, saveState, uid, escapeHtml, gradeOf, iconHtml, blankIconHtml,
   aptGroupsHtml, wireChips, sortRowsByMode, raceDateLabel, debounce
 } from './core.js';
-import { addToMyList, removeFromMyList, toggleTrophy, findRaceByExactName, exportList, importList } from './standard-view.js';
-import { applySettingsUI, renderMainView, closeSettingsPanel } from './main.js';
+import { addToMyList, removeFromMyList, toggleTrophy, findRaceByExactName } from './standard-view.js';
+import {
+  closeSettingsPanel,
+  toggleMode, toggleColorTheme, setAllowCustomTrainees, setAllowRaceSearch,
+  setAllowCustomTrophies, setCalendarViewMode, openBackupModal, openAboutModal
+} from './main.js';
 
 export const CAL_YEAR_GROUPS = ["Junior", "Classic", "Senior"];
 const CAL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -78,6 +82,11 @@ let calTraineePanelOpen = false;
 let calTraineePanelRevealed = false;
 let calTraineeSearch = "";
 let calTraineeSort = "default";
+
+let moreToolsOpen = null;
+function moreToolsDefaultOpen() {
+  return !window.matchMedia('(max-width: 720px)').matches;
+}
 
 const CAL_EMPTY_TRAINEE = {
   id: "__empty__",
@@ -253,6 +262,7 @@ function calTraineePanelHtml(activeTrainee) {
 }
 
 function calSidebarHtml(activeTrainee, isEmpty) {
+  if (moreToolsOpen === null) moreToolsOpen = moreToolsDefaultOpen();
   const iconBlock = isEmpty ? blankIconHtml(72) : iconHtml(activeTrainee.name, 72);
   return `
   <div class="cal-sidebar${calTraineePanelOpen ? ' panel-open' : ''}">
@@ -281,11 +291,59 @@ function calSidebarHtml(activeTrainee, isEmpty) {
       </div>
     </div>
     <div class="cal-tool-box">
-      <div class="cal-tool-box-title">More tools</div>
-      <div class="cal-tool-list">
-        <button class="btn small" id="cal-export-btn">Export list</button>
-        <label class="btn small" for="cal-import-file">Import list</label>
-        <input type="file" id="cal-import-file" accept=".json">
+      <button class="cal-tool-box-toggle" id="cal-tools-toggle">
+        <span class="cal-tool-box-title">More tools</span>
+        <span class="cal-trainee-arrow${moreToolsOpen ? ' open' : ''}">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+      </button>
+      <div class="cal-tool-list${moreToolsOpen ? ' open' : ''}">
+        <button class="btn small" id="cal-backup-btn">Backup</button>
+        <div class="settings-divider"></div>
+        <div class="settings-group-label">Appearance</div>
+        <div class="settings-row settings-row-icons">
+          <button class="icon-pill-btn" id="cal-mode-toggle-btn" aria-label="Toggle light/dark mode" title="Toggle mode">
+            <svg class="icon-toggle-sun" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M12 2.5V5M12 19V21.5M4.2 4.2L6 6M18 18L19.8 19.8M2.5 12H5M19 12H21.5M4.2 19.8L6 18M18 6L19.8 4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <svg class="icon-toggle-moon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="icon-pill-btn" id="cal-theme-toggle-btn" aria-label="Toggle Turf/Dirt color theme" title="Toggle color theme">
+            <svg class="icon-toggle-turf" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6 20V13C6 10 8 8 8 8C8 8 6 10 6 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M12 20V10C12 7 14 5 14 5C14 5 12 7 12 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M18 20V13C18 10 20 8 20 8C20 8 18 10 18 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <svg class="icon-toggle-dirt" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 18L8 9L12 15L15 10L21 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M3 20H21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+        <div class="settings-divider"></div>
+        <div class="settings-group-label">Trainees</div>
+        <div class="settings-row">
+          <span>Custom trainees</span>
+          <label class="switch"><input type="checkbox" id="cal-toggle-custom-trainee" ${state.settings.allowCustomTrainees ? 'checked' : ''}><span class="switch-slider"></span></label>
+        </div>
+        <div class="settings-divider"></div>
+        <div class="settings-group-label">Trophies &amp; races</div>
+        <div class="settings-row">
+          <span>Race search</span>
+          <label class="switch"><input type="checkbox" id="cal-toggle-race-search" ${state.settings.allowRaceSearch ? 'checked' : ''}><span class="switch-slider"></span></label>
+        </div>
+        <div class="settings-row settings-row-sub${state.settings.allowRaceSearch ? '' : ' settings-row-disabled'}" id="cal-toggle-custom-trophy-row">
+          <span>Custom trophies</span>
+          <label class="switch"><input type="checkbox" id="cal-toggle-custom-trophy" ${state.settings.allowCustomTrophies ? 'checked' : ''} ${state.settings.allowRaceSearch ? '' : 'disabled'}><span class="switch-slider"></span></label>
+        </div>
+        <div class="settings-divider"></div>
+        <button class="btn small settings-about-btn" id="cal-about-btn">About Completionist Board</button>
+        <div class="settings-divider"></div>
         <button class="btn small ghost" id="cal-exit-btn">Exit Calendar View</button>
       </div>
     </div>
@@ -501,18 +559,35 @@ export function renderCalendarView() {
 
   wireCalPage(document.getElementById('cal-main-page'), activeTrainee, renderCalendarView);
 
-  const exportBtn = document.getElementById('cal-export-btn');
-  if (exportBtn) exportBtn.addEventListener('click', exportList);
-  const importFile = document.getElementById('cal-import-file');
-  if (importFile) importFile.addEventListener('change', e => {
-    if (e.target.files[0]) importList(e.target.files[0]);
-    e.target.value = "";
+  const toolsToggle = document.getElementById('cal-tools-toggle');
+  if (toolsToggle) toolsToggle.addEventListener('click', () => {
+    moreToolsOpen = !moreToolsOpen;
+    renderCalendarView();
   });
+
+  const calBackupBtn = document.getElementById('cal-backup-btn');
+  if (calBackupBtn) calBackupBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openBackupModal();
+  });
+  const calAboutBtn = document.getElementById('cal-about-btn');
+  if (calAboutBtn) calAboutBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openAboutModal();
+  });
+  const calModeToggleBtn = document.getElementById('cal-mode-toggle-btn');
+  if (calModeToggleBtn) calModeToggleBtn.addEventListener('click', toggleMode);
+  const calThemeToggleBtn = document.getElementById('cal-theme-toggle-btn');
+  if (calThemeToggleBtn) calThemeToggleBtn.addEventListener('click', toggleColorTheme);
+  const calTrainToggle = document.getElementById('cal-toggle-custom-trainee');
+  if (calTrainToggle) calTrainToggle.addEventListener('change', () => setAllowCustomTrainees(calTrainToggle.checked));
+  const calRaceSearchToggle = document.getElementById('cal-toggle-race-search');
+  if (calRaceSearchToggle) calRaceSearchToggle.addEventListener('change', () => setAllowRaceSearch(calRaceSearchToggle.checked));
+  const calTrophyToggle = document.getElementById('cal-toggle-custom-trophy');
+  if (calTrophyToggle) calTrophyToggle.addEventListener('change', () => setAllowCustomTrophies(calTrophyToggle.checked));
+
   const exitBtn = document.getElementById('cal-exit-btn');
   if (exitBtn) exitBtn.addEventListener('click', () => {
-    state.settings.calendarViewMode = false;
-    saveState();
-    applySettingsUI();
-    renderMainView();
+    setCalendarViewMode(false);
   });
 }

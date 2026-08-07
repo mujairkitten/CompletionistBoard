@@ -5,6 +5,7 @@ import {
   aptGroupsHtml, wireChips, iconHtml, weakAptitudes, sortRowsByMode, raceDateLabel, debounce
 } from './core.js';
 import { calPageHtml, wireCalPage, calGradeColor, CAL_YEAR_GROUPS } from './calendar.js';
+import { renderMainView } from './main.js';
 
 export let dbSort = "default";
 
@@ -348,28 +349,34 @@ export function exportList() {
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+function importListFromJsonText(text) {
+  try {
+    const parsed = JSON.parse(text);
+    if (!parsed || !Array.isArray(parsed.myList)) throw new Error("bad format");
+    const knownNames = new Set(state.myList.map(trainee => trainee.name.toLocaleLowerCase()));
+    const trainees = normalizeImportedTrainees(parsed.myList, state.myList).filter(trainee => {
+      const key = trainee.name.toLocaleLowerCase();
+      if (knownNames.has(key)) return false;
+      knownNames.add(key);
+      return true;
+    });
+    state.myList.push(...trainees);
+    saveState(); renderMainView();
+    if (trainees.length !== parsed.myList.length) {
+      alert(`Imported ${trainees.length} trainee${trainees.length === 1 ? '' : 's'}. Duplicate or invalid entries were skipped.`);
+    }
+    return true;
+  } catch (e) {
+    alert("Couldn't read that — expected a Completionist Board export.");
+    return false;
+  }
+}
+export function importListFromText(text) {
+  return importListFromJsonText(text);
+}
 export function importList(file) {
   const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const parsed = JSON.parse(reader.result);
-      if (!parsed || !Array.isArray(parsed.myList)) throw new Error("bad format");
-      const knownNames = new Set(state.myList.map(trainee => trainee.name.toLocaleLowerCase()));
-      const trainees = normalizeImportedTrainees(parsed.myList, state.myList).filter(trainee => {
-        const key = trainee.name.toLocaleLowerCase();
-        if (knownNames.has(key)) return false;
-        knownNames.add(key);
-        return true;
-      });
-      state.myList.push(...trainees);
-      saveState(); renderMyList(); renderDatabase();
-      if (trainees.length !== parsed.myList.length) {
-        alert(`Imported ${trainees.length} trainee${trainees.length === 1 ? '' : 's'}. Duplicate or invalid entries were skipped.`);
-      }
-    } catch (e) {
-      alert("Couldn't read that file — expected a Completionist Board export.");
-    }
-  };
+  reader.onload = () => { importListFromJsonText(reader.result); };
   reader.readAsText(file);
 }
 
@@ -377,11 +384,6 @@ export function wireStandardViewControls() {
   document.getElementById('db-search').addEventListener('input', debounce(renderDatabase, 120));
   document.getElementById('custom-add-btn').addEventListener('click', addCustom);
   document.getElementById('custom-name').addEventListener('keydown', e => { if (e.key === 'Enter') addCustom(); });
-  document.getElementById('export-btn').addEventListener('click', exportList);
-  document.getElementById('import-file').addEventListener('change', e => {
-    if (e.target.files[0]) importList(e.target.files[0]);
-    e.target.value = "";
-  });
 
   document.querySelectorAll('#db-sort .sort-btn').forEach(btn => {
     btn.addEventListener('click', () => {
