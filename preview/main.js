@@ -1,4 +1,4 @@
-import { state, loadState, saveState } from './core.js';
+import { state, loadState, saveState, debounce } from './core.js';
 import { renderDatabase, renderMyList, addCustom, wireStandardViewControls, exportList, importList, importListFromText } from './standard-view.js';
 import { renderCalendarView, closeCalTraineePanel } from './calendar.js';
 
@@ -188,6 +188,13 @@ function wireBackupModal() {
   });
 }
 
+function syncTopbarHeight() {
+  const topbar = document.querySelector('.topbar');
+  if (!topbar) return;
+  const height = topbar.getBoundingClientRect().height;
+  document.documentElement.style.setProperty('--topbar-h', `${height}px`);
+}
+
 async function init() {
   await loadState();
   applySettingsUI();
@@ -195,6 +202,8 @@ async function init() {
 
   wireStandardViewControls();
   wireBackupModal();
+  syncTopbarHeight();
+  window.addEventListener('resize', debounce(syncTopbarHeight, 150));
 
   const aboutBtn = document.getElementById('about-btn');
   const aboutOverlay = document.getElementById('about-overlay');
