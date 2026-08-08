@@ -28,8 +28,7 @@ export function renderDatabase() {
   const grid = document.getElementById('db-grid');
   const filter = document.getElementById('db-search').value.trim().toLowerCase();
   const list = sortRowsByMode(DATABASE.filter(d => d.name.toLowerCase().includes(filter)), dbSort);
-  document.getElementById('db-count').textContent = `${list.length} / ${DATABASE.length}`;
-  document.getElementById('db-gate').textContent = DATABASE.length;
+  document.getElementById('db-count').textContent = `${list.length}/${DATABASE.length}`;
 
   const addedNames = new Set(state.myList.map(t => t.name.toLowerCase()));
   const indexByName = new Map(DATABASE.map((d, i) => [d.name, i]));
@@ -63,7 +62,7 @@ export function addToMyList(name, apt) {
 export function renderMyList() {
   const wrap = document.getElementById('mylist');
   const emptyEl = document.getElementById('mylist-empty');
-  document.getElementById('my-gate').textContent = state.myList.length;
+  document.getElementById('my-count').textContent = `${state.myList.length}/${DATABASE.length}`;
 
   if (state.myList.length === 0) {
     emptyEl.style.display = "block";
