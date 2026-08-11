@@ -29,7 +29,6 @@ const MAX_TROPHIES_PER_TRAINEE = 300;
 function defaultSettings() {
   return {
     allowCustomTrainees: true,
-    allowRaceSearch: true,
     allowCustomTrophies: true,
     calendarViewMode: false,
     lightMode: false,
@@ -158,11 +157,10 @@ function normalizeTrainee(value, usedTraineeIds) {
 function normalizeSettings(value, trainees) {
   const raw = isPlainObject(value) ? value : {};
   const settings = defaultSettings();
-  for (const key of ['allowCustomTrainees', 'allowRaceSearch', 'allowCustomTrophies', 'calendarViewMode', 'lightMode']) {
+  for (const key of ['allowCustomTrainees', 'allowCustomTrophies', 'calendarViewMode', 'lightMode']) {
     if (typeof raw[key] === 'boolean') settings[key] = raw[key];
   }
   settings.colorTheme = raw.colorTheme === 'dirt' ? 'dirt' : 'turf';
-  if (!settings.allowRaceSearch) settings.allowCustomTrophies = true;
   if (typeof raw.activeTraineeId === 'string' && trainees.some(t => t.id === raw.activeTraineeId)) {
     settings.activeTraineeId = raw.activeTraineeId;
   }
@@ -234,23 +232,10 @@ export function gradeOf(v) { return typeof v === 'string' ? v : v.base; }
 export function altOf(v) { return typeof v === 'string' ? null : v; }
 
 export const tooltipEl = document.getElementById('tooltip');
-export function showTooltip(target, catKey, aptValue) {
-  const cat = CATS.find(c => c.key === catKey);
-  const grade = gradeOf(aptValue);
-  const alt = altOf(aptValue);
-  const info = GRADE_INFO[grade];
-  let html = `
-    <div class="tt-head" style="color:var(--${info.tier})">${cat.label} — ${grade}${alt ? ' / ' + alt.alt : ''}</div>
-    <div class="tt-stat">${cat.stat} · ${info.pct}</div>
-    <div>${info.tip}</div>
-  `;
-  if (alt) {
-    html += `<div class="tt-variant">${escapeHtml(alt.note)}</div>`;
-  }
-  tooltipEl.innerHTML = html;
-
+function positionTooltip(target) {
   const rect = target.getBoundingClientRect();
-  tooltipEl.style.left = Math.min(rect.left, window.innerWidth - 236) + "px";
+  const tooltipWidth = tooltipEl.getBoundingClientRect().width;
+  tooltipEl.style.left = Math.min(rect.left, window.innerWidth - tooltipWidth - 16) + "px";
 
   const gap = 8;
   const tooltipHeight = tooltipEl.getBoundingClientRect().height;
@@ -258,6 +243,32 @@ export function showTooltip(target, catKey, aptValue) {
   if (top < gap) top = rect.bottom + gap;
   tooltipEl.style.top = top + "px";
   tooltipEl.classList.add('show');
+}
+export function showTooltip(target, catKey, aptValue) {
+  const cat = CATS.find(c => c.key === catKey);
+  const grade = gradeOf(aptValue);
+  const alt = altOf(aptValue);
+  const info = GRADE_INFO[grade];
+  let html = `
+    <div class="tt-head" style="color:var(--${info.tier}-text)">${cat.label} — ${grade}${alt ? ' / ' + alt.alt : ''}</div>
+    <div class="tt-stat">${cat.stat} · ${info.pct}</div>
+    <div>${info.tip}</div>
+  `;
+  if (alt) {
+    html += `<div class="tt-variant">${escapeHtml(alt.note)}</div>`;
+  }
+  tooltipEl.style.width = '';
+  tooltipEl.style.maxWidth = '';
+  tooltipEl.style.borderTopColor = `var(--${info.tier})`;
+  tooltipEl.innerHTML = html;
+  positionTooltip(target);
+}
+export function showTextTooltip(target, text) {
+  tooltipEl.style.width = 'auto';
+  tooltipEl.style.maxWidth = '200px';
+  tooltipEl.style.borderTopColor = '';
+  tooltipEl.innerHTML = `<div>${escapeHtml(text)}</div>`;
+  positionTooltip(target);
 }
 export function hideTooltip() { tooltipEl.classList.remove('show'); }
 
@@ -303,25 +314,51 @@ export function wireChips(root) {
 
   root.addEventListener('mouseover', (e) => {
     const chip = e.target.closest('.chip');
-    if (!chip || !root.contains(chip)) return;
-    if (chip.contains(e.relatedTarget)) return;
-    showTooltip(chip, chip.dataset.cat, JSON.parse(chip.dataset.json));
+    if (chip && root.contains(chip)) {
+      if (chip.contains(e.relatedTarget)) return;
+      showTooltip(chip, chip.dataset.cat, JSON.parse(chip.dataset.json));
+      return;
+    }
+    const iconBtn = e.target.closest('.icon-pill-btn[data-tooltip]');
+    if (iconBtn && root.contains(iconBtn)) {
+      if (iconBtn.contains(e.relatedTarget)) return;
+      showTextTooltip(iconBtn, iconBtn.dataset.tooltip);
+    }
   });
   root.addEventListener('mouseout', (e) => {
     const chip = e.target.closest('.chip');
-    if (!chip || !root.contains(chip)) return;
-    if (chip.contains(e.relatedTarget)) return;
-    hideTooltip();
+    if (chip && root.contains(chip)) {
+      if (chip.contains(e.relatedTarget)) return;
+      hideTooltip();
+      return;
+    }
+    const iconBtn = e.target.closest('.icon-pill-btn[data-tooltip]');
+    if (iconBtn && root.contains(iconBtn)) {
+      if (iconBtn.contains(e.relatedTarget)) return;
+      hideTooltip();
+    }
   });
   root.addEventListener('focusin', (e) => {
     const chip = e.target.closest('.chip');
-    if (!chip || !root.contains(chip)) return;
-    showTooltip(chip, chip.dataset.cat, JSON.parse(chip.dataset.json));
+    if (chip && root.contains(chip)) {
+      showTooltip(chip, chip.dataset.cat, JSON.parse(chip.dataset.json));
+      return;
+    }
+    const iconBtn = e.target.closest('.icon-pill-btn[data-tooltip]');
+    if (iconBtn && root.contains(iconBtn)) {
+      showTextTooltip(iconBtn, iconBtn.dataset.tooltip);
+    }
   });
   root.addEventListener('focusout', (e) => {
     const chip = e.target.closest('.chip');
-    if (!chip || !root.contains(chip)) return;
-    hideTooltip();
+    if (chip && root.contains(chip)) {
+      hideTooltip();
+      return;
+    }
+    const iconBtn = e.target.closest('.icon-pill-btn[data-tooltip]');
+    if (iconBtn && root.contains(iconBtn)) {
+      hideTooltip();
+    }
   });
 }
 

@@ -1,4 +1,4 @@
-import { state, loadState, saveState, debounce } from './core.js';
+import { state, loadState, saveState, debounce, wireChips } from './core.js';
 import { renderDatabase, renderMyList, addCustom, wireStandardViewControls, exportList, importList, importListFromText } from './standard-view.js';
 import { renderCalendarView, closeCalTraineePanel } from './calendar.js';
 
@@ -19,27 +19,16 @@ export function renderMainView() {
 
 export function applySettingsUI() {
   const trainToggle = document.getElementById('toggle-custom-trainee');
-  const raceSearchToggle = document.getElementById('toggle-race-search');
   const trophyToggle = document.getElementById('toggle-custom-trophy');
-  const calViewToggle = document.getElementById('toggle-calendar-view');
   const trainRow = document.getElementById('custom-trainee-row');
   const settingsBtn = document.getElementById('settings-btn');
   const backupBtn = document.getElementById('backup-btn');
-
-  if (!state.settings.allowRaceSearch) state.settings.allowCustomTrophies = true;
 
   document.body.classList.toggle('light', !!state.settings.lightMode);
   document.body.classList.toggle('dirt', state.settings.colorTheme === 'dirt');
 
   if (trainToggle) trainToggle.checked = !!state.settings.allowCustomTrainees;
-  if (raceSearchToggle) raceSearchToggle.checked = !!state.settings.allowRaceSearch;
-  if (trophyToggle) {
-    trophyToggle.checked = !!state.settings.allowCustomTrophies;
-    trophyToggle.disabled = !state.settings.allowRaceSearch;
-  }
-  const trophyRow = document.getElementById('toggle-custom-trophy-row');
-  if (trophyRow) trophyRow.classList.toggle('settings-row-disabled', !state.settings.allowRaceSearch);
-  if (calViewToggle) calViewToggle.checked = !!state.settings.calendarViewMode;
+  if (trophyToggle) trophyToggle.checked = !!state.settings.allowCustomTrophies;
 
   if (trainRow) {
     trainRow.style.display = state.settings.allowCustomTrainees ? '' : 'none';
@@ -97,12 +86,7 @@ export function setAllowCustomTrainees(value) {
   state.settings.allowCustomTrainees = value;
   saveState(); applySettingsUI();
 }
-export function setAllowRaceSearch(value) {
-  state.settings.allowRaceSearch = value;
-  saveState(); applySettingsUI(); renderMainView();
-}
 export function setAllowCustomTrophies(value) {
-  if (!state.settings.allowRaceSearch) return;
   state.settings.allowCustomTrophies = value;
   saveState(); applySettingsUI(); renderMainView();
 }
@@ -234,6 +218,7 @@ async function init() {
       settingsPanel.classList.toggle('show');
     });
     settingsPanel.addEventListener('click', e => e.stopPropagation());
+    wireChips(settingsPanel);
   }
 
   const backupBtn = document.getElementById('backup-btn');
@@ -244,17 +229,18 @@ async function init() {
 
   const modeToggleBtn = document.getElementById('mode-toggle-btn');
   const themeToggleBtn = document.getElementById('theme-toggle-btn');
+  const calEnterBtn = document.getElementById('cal-enter-btn');
   const trainToggle = document.getElementById('toggle-custom-trainee');
-  const raceSearchToggle = document.getElementById('toggle-race-search');
   const trophyToggle = document.getElementById('toggle-custom-trophy');
-  const calViewToggle = document.getElementById('toggle-calendar-view');
 
   if (modeToggleBtn) modeToggleBtn.addEventListener('click', toggleMode);
   if (themeToggleBtn) themeToggleBtn.addEventListener('click', toggleColorTheme);
+  if (calEnterBtn) calEnterBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setCalendarViewMode(true);
+  });
   if (trainToggle) trainToggle.addEventListener('change', () => setAllowCustomTrainees(trainToggle.checked));
-  if (raceSearchToggle) raceSearchToggle.addEventListener('change', () => setAllowRaceSearch(raceSearchToggle.checked));
   if (trophyToggle) trophyToggle.addEventListener('change', () => setAllowCustomTrophies(trophyToggle.checked));
-  if (calViewToggle) calViewToggle.addEventListener('change', () => setCalendarViewMode(calViewToggle.checked));
 
   document.addEventListener('click', () => {
     closeSettingsPanel();

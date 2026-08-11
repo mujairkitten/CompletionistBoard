@@ -1,13 +1,13 @@
 import { DATABASE } from './data/database.js';
-import { RACES } from './data/races.js';
+import { RACES, TRACK_TO_APT_KEY, DIST_TO_APT_KEY } from './data/races.js';
 import {
-  state, saveState, uid, escapeHtml, gradeOf, iconHtml, blankIconHtml,
+  state, saveState, uid, escapeHtml, gradeOf, GRADE_INFO, iconHtml, blankIconHtml,
   aptGroupsHtml, wireChips, sortRowsByMode, raceDateLabel, debounce
 } from './core.js';
 import { addToMyList, removeFromMyList, toggleTrophy, findRaceByExactName } from './standard-view.js';
 import {
   closeSettingsPanel,
-  toggleMode, toggleColorTheme, setAllowCustomTrainees, setAllowRaceSearch,
+  toggleMode, toggleColorTheme, setAllowCustomTrainees,
   setAllowCustomTrophies, setCalendarViewMode, openBackupModal, openAboutModal
 } from './main.js';
 
@@ -75,6 +75,11 @@ function calendarToggleRace(t, race) {
   }
   saveState();
 }
+function addRaceToListUnchecked(t, race) {
+  if (trophyForRace(t, race.name)) return;
+  t.trophies.push({ id: uid(), name: race.name, checked: false, grade: race.grade, track: race.track, distance: race.distance, year: race.year, turn: race.turn, month: race.month });
+  saveState();
+}
 
 let calViewTab = "Junior";
 
@@ -108,9 +113,11 @@ export function calGradeColor(grade) {
 function calRaceRowHtml(r, opts) {
   const draggable = !!opts.draggable;
   const checked = !!opts.checked;
+  const showAdd = !!opts.showAdd;
   return `
     <div class="cal-race-row${checked ? ' done' : ''}" ${draggable ? 'draggable="true"' : ''} data-race="${escapeHtml(r.name)}">
       ${draggable ? '<span class="drag-handle" title="Drag to reorder">⠿</span>' : ''}
+      ${showAdd && draggable ? `<button class="cal-race-add-btn" data-race="${escapeHtml(r.name)}" title="Add to race list (unchecked)" aria-label="Add ${escapeHtml(r.name)} to race list, unchecked">+</button>` : ''}
       <input type="checkbox" class="cal-tick" data-race="${escapeHtml(r.name)}" ${checked ? 'checked' : ''}>
       <span class="cal-grade-tag" style="background:${calGradeColor(r.grade)}">${r.grade}</span>
       <span class="cal-race-info">
@@ -120,7 +127,7 @@ function calRaceRowHtml(r, opts) {
     </div>`;
 }
 
-function calCellHtml(t, yearGroup, month, turn) {
+function calCellHtml(t, yearGroup, month, turn, opts) {
   const slotKey = calSlotKey(month, turn);
   const slotRaces = racesForSlot(yearGroup, month, turn);
   const done = slotRaces.filter(r => isRaceDone(t, r.name));
@@ -131,17 +138,17 @@ function calCellHtml(t, yearGroup, month, turn) {
     return `<div class="cal-cell cal-cell-empty" data-slot="${slotKey}" data-year="${yearGroup}">${label}</div>`;
   }
 
-  const pendingHtml = pending.map(r => calRaceRowHtml(r, { draggable: true, checked: false })).join("");
+  const pendingHtml = pending.map(r => calRaceRowHtml(r, { draggable: true, checked: false, showAdd: opts.showAdd })).join("");
 
   const doneHtml = done.length ? `<div class="cal-done-divider">${done.map(r => calRaceRowHtml(r, { draggable: false, checked: true })).join("")}</div>` : "";
 
   return `<div class="cal-cell" data-slot="${slotKey}" data-year="${yearGroup}">${label}${pendingHtml}${doneHtml}</div>`;
 }
 
-function calGridHtml(t, yearGroup) {
+function calGridHtml(t, yearGroup, opts) {
   const slots = [];
   CAL_MONTHS.forEach(month => CAL_TURNS.forEach(turn => slots.push({ month, turn })));
-  const cellsHtml = slots.map(s => calCellHtml(t, yearGroup, s.month, s.turn)).join("");
+  const cellsHtml = slots.map(s => calCellHtml(t, yearGroup, s.month, s.turn, opts)).join("");
   return `<div class="cal-grid-46">${cellsHtml}</div>`;
 }
 
@@ -157,9 +164,9 @@ function calOobHtml(t) {
     </div>`).join("")}</div>`;
 }
 
-export function calPageHtml(t, tab) {
+export function calPageHtml(t, tab, opts = {}) {
   if (tab === "OoB") return calOobHtml(t);
-  return calGridHtml(t, tab);
+  return calGridHtml(t, tab, opts);
 }
 
 export function wireCalPage(root, t, onChange) {
@@ -167,6 +174,14 @@ export function wireCalPage(root, t, onChange) {
     cb.addEventListener('change', () => {
       const race = RACES.find(r => r.name === cb.dataset.race);
       if (race) { calendarToggleRace(t, race); onChange(); }
+    });
+  });
+
+  root.querySelectorAll('.cal-race-add-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const race = RACES.find(r => r.name === btn.dataset.race);
+      if (race) { addRaceToListUnchecked(t, race); onChange(); }
     });
   });
 
@@ -306,7 +321,7 @@ function calSidebarHtml(activeTrainee, isEmpty) {
       <div class="cal-tool-list${moreToolsRevealed ? ' open' : ''}" id="cal-tools-body">
         <div class="settings-group-label">Appearance</div>
         <div class="settings-row settings-row-icons">
-          <button class="icon-pill-btn" id="cal-mode-toggle-btn" aria-label="Toggle light/dark mode" title="Toggle mode">
+          <button class="icon-pill-btn" id="cal-mode-toggle-btn" aria-label="Toggle light/dark mode" data-tooltip="Toggle mode">
             <svg class="icon-toggle-sun" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <circle cx="12" cy="12" r="4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               <path d="M12 2.5V5M12 19V21.5M4.2 4.2L6 6M18 18L19.8 19.8M2.5 12H5M19 12H21.5M4.2 19.8L6 18M18 6L19.8 4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -315,7 +330,7 @@ function calSidebarHtml(activeTrainee, isEmpty) {
               <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </button>
-          <button class="icon-pill-btn" id="cal-theme-toggle-btn" aria-label="Toggle Turf/Dirt color theme" title="Toggle color theme">
+          <button class="icon-pill-btn" id="cal-theme-toggle-btn" aria-label="Toggle Turf/Dirt color theme" data-tooltip="Toggle color theme">
             <svg class="icon-toggle-turf" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M6 20V13C6 10 8 8 8 8C8 8 6 10 6 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M12 20V10C12 7 14 5 14 5C14 5 12 7 12 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -326,35 +341,34 @@ function calSidebarHtml(activeTrainee, isEmpty) {
               <path d="M3 20H21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
           </button>
+          <button class="icon-pill-btn" id="cal-exit-btn" aria-label="Exit Calendar View" data-tooltip="Exit Calendar View">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 14L4 9L9 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4 9H14C17.3137 9 20 11.6863 20 15C20 18.3137 17.3137 21 14 21H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
         </div>
         <div class="settings-divider"></div>
-        <div class="settings-group-label">Trainees</div>
+        <div class="settings-group-label">Customize</div>
         <div class="settings-row">
           <span>Custom trainees</span>
           <label class="switch"><input type="checkbox" id="cal-toggle-custom-trainee" ${state.settings.allowCustomTrainees ? 'checked' : ''}><span class="switch-slider"></span></label>
         </div>
-        <div class="settings-divider"></div>
-        <div class="settings-group-label">Trophies &amp; races</div>
         <div class="settings-row">
-          <span>Race search</span>
-          <label class="switch"><input type="checkbox" id="cal-toggle-race-search" ${state.settings.allowRaceSearch ? 'checked' : ''}><span class="switch-slider"></span></label>
-        </div>
-        <div class="settings-row settings-row-sub${state.settings.allowRaceSearch ? '' : ' settings-row-disabled'}" id="cal-toggle-custom-trophy-row">
           <span>Custom trophies</span>
-          <label class="switch"><input type="checkbox" id="cal-toggle-custom-trophy" ${state.settings.allowCustomTrophies ? 'checked' : ''} ${state.settings.allowRaceSearch ? '' : 'disabled'}><span class="switch-slider"></span></label>
+          <label class="switch"><input type="checkbox" id="cal-toggle-custom-trophy" ${state.settings.allowCustomTrophies ? 'checked' : ''}><span class="switch-slider"></span></label>
         </div>
         <div class="settings-divider"></div>
         <div class="cal-tool-row-pair">
           <button class="btn small" id="cal-backup-btn">Backup</button>
           <button class="btn small" id="cal-about-btn">About</button>
         </div>
-        <button class="btn small ghost" id="cal-exit-btn">Exit Calendar View</button>
       </div>
     </div>
   </div>`;
 }
 
-function wireCalLocate(host) {
+function wireCalLocate(host, t) {
   const input = document.getElementById('cal-locate-input');
   const box = document.getElementById('cal-locate-suggest');
   if (!input || !box) return;
@@ -371,7 +385,14 @@ function wireCalLocate(host) {
     const matches = RACES.filter(r => r.name.toLowerCase().includes(q)).slice(0, 20);
     box.innerHTML = matches.length === 0
       ? `<div class="race-suggest-empty">No matching race.</div>`
-      : matches.map(r => `
+      : matches.map(r => {
+        const trackKey = TRACK_TO_APT_KEY[r.track];
+        const distKey = DIST_TO_APT_KEY[r.distance];
+        const trackGrade = gradeOf(t.aptitudes[trackKey]);
+        const distGrade = gradeOf(t.aptitudes[distKey]);
+        const trackTier = GRADE_INFO[trackGrade].tier;
+        const distTier = GRADE_INFO[distGrade].tier;
+        return `
         <div class="race-suggest-item" data-race="${escapeHtml(r.name)}">
           <span class="race-grade-tag" style="background:${calGradeColor(r.grade)}">${r.grade}</span>
           <span class="race-info">
@@ -379,9 +400,11 @@ function wireCalLocate(host) {
             <span class="race-date">${escapeHtml(raceDateLabel(r))}</span>
           </span>
           <span class="race-meta">
-            <span class="mini-tag" style="background:var(--panel-2);color:var(--ink-dim)">${r.track} · ${r.distance}</span>
+            <span class="mini-tag" style="background:var(--${trackTier})">${r.track}</span>
+            <span class="mini-tag" style="background:var(--${distTier})">${r.distance}</span>
           </span>
-        </div>`).join("");
+        </div>`;
+      }).join("");
     setOpen(true);
   };
 
@@ -552,7 +575,7 @@ export function renderCalendarView() {
 
   wireChips(host);
   wireCalTraineePanel(host, activeTrainee);
-  wireCalLocate(host);
+  wireCalLocate(host, activeTrainee);
 
   document.getElementById('cal-main-tabs').querySelectorAll('.cal-tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -605,8 +628,6 @@ export function renderCalendarView() {
   if (calThemeToggleBtn) calThemeToggleBtn.addEventListener('click', toggleColorTheme);
   const calTrainToggle = document.getElementById('cal-toggle-custom-trainee');
   if (calTrainToggle) calTrainToggle.addEventListener('change', () => setAllowCustomTrainees(calTrainToggle.checked));
-  const calRaceSearchToggle = document.getElementById('cal-toggle-race-search');
-  if (calRaceSearchToggle) calRaceSearchToggle.addEventListener('change', () => setAllowRaceSearch(calRaceSearchToggle.checked));
   const calTrophyToggle = document.getElementById('cal-toggle-custom-trophy');
   if (calTrophyToggle) calTrophyToggle.addEventListener('change', () => setAllowCustomTrophies(calTrophyToggle.checked));
 

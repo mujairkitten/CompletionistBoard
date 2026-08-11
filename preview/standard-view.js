@@ -97,17 +97,15 @@ export function renderMyList() {
           hideSuggestBox(suggestBox);
         }
       });
-      if (state.settings.allowRaceSearch) {
-        addTInput.addEventListener('input', () => {
-          renderRaceSuggestions(t, addTInput.value, suggestBox, addTInput);
-        });
-        addTInput.addEventListener('focus', () => {
-          renderRaceSuggestions(t, addTInput.value, suggestBox, addTInput);
-        });
-        addTInput.addEventListener('blur', () => {
-          setTimeout(() => hideSuggestBox(suggestBox), 150);
-        });
-      }
+      addTInput.addEventListener('input', () => {
+        renderRaceSuggestions(t, addTInput.value, suggestBox, addTInput);
+      });
+      addTInput.addEventListener('focus', () => {
+        renderRaceSuggestions(t, addTInput.value, suggestBox, addTInput);
+      });
+      addTInput.addEventListener('blur', () => {
+        setTimeout(() => hideSuggestBox(suggestBox), 150);
+      });
     }
 
     t.trophies.forEach(tr => {
@@ -206,10 +204,6 @@ function renderRaceSuggestions(trainee, query, box, inputEl) {
 export function addTrophyFromInput(tid, rawName) {
   const name = (rawName || "").trim();
   if (!name) return;
-  if (!state.settings.allowRaceSearch) {
-    addTrophy(tid, name, null);
-    return;
-  }
   const race = findRaceByExactName(name);
   if (!race && !state.settings.allowCustomTrophies) return;
   addTrophy(tid, name, race ? raceMeta(race) : null);
@@ -270,7 +264,7 @@ function myCardHtml(t) {
         <div class="cal-tabs" id="caltabs-${t.id}">
           ${inlineTabs.map(tab => `<button class="cal-tab-btn ${inlineActiveTab === tab ? 'active' : ''}" data-tab="${tab}">${tab === "OoB" ? "Out-of-Bond" : tab}</button>`).join("")}
         </div>
-        <div class="cal-page" id="calpage-${t.id}">${calPageHtml(t, inlineActiveTab)}</div>
+        <div class="cal-page" id="calpage-${t.id}">${calPageHtml(t, inlineActiveTab, { showAdd: true })}</div>
       </div>
     </div>`;
 
@@ -291,9 +285,9 @@ function myCardHtml(t) {
       </div>
       <div class="trophy-list">${trophyHtml}</div>
       <div class="add-trophy">
-        <input type="text" id="addt-input-${t.id}" placeholder="${!state.settings.allowRaceSearch ? 'Add a custom trophy' : (state.settings.allowCustomTrophies ? 'Search races (G1-G3) or type a custom trophy' : 'Search races (G1-G3)')}" autocomplete="off">
+        <input type="text" id="addt-input-${t.id}" placeholder="Search races…" autocomplete="off">
         <button class="btn small" id="addt-btn-${t.id}">+ Add</button>
-        ${state.settings.allowRaceSearch ? `<div class="race-suggest" id="addt-suggest-${t.id}"></div>` : ""}
+        <div class="race-suggest" id="addt-suggest-${t.id}"></div>
       </div>
     </div>
     ${inlineCalHtml}
@@ -340,11 +334,22 @@ export function addCustom() {
   input.value = "";
 }
 
+function backupFilename() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const yy = pad(d.getFullYear() % 100);
+  const mm = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const mi = pad(d.getMinutes());
+  const ss = pad(d.getSeconds());
+  return `CompBoard-${yy}${mm}${dd}-${hh}${mi}${ss}.json`;
+}
 export function exportList() {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = "completionist-list.json";
+  a.href = url; a.download = backupFilename();
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
@@ -379,6 +384,25 @@ export function importList(file) {
   reader.readAsText(file);
 }
 
+function wireBlockCollapse(toggleBtn, body) {
+  if (!toggleBtn || !body) return;
+  toggleBtn.addEventListener('click', () => {
+    const willOpen = !body.classList.contains('open');
+    if (!willOpen) {
+      body.classList.remove('overflow-visible');
+    }
+    body.classList.toggle('open', willOpen);
+    const arrow = toggleBtn.querySelector('.cal-trainee-arrow');
+    if (arrow) arrow.classList.toggle('open', willOpen);
+  });
+  body.addEventListener('transitionend', (e) => {
+    if (e.propertyName !== 'max-height') return;
+    if (body.classList.contains('open')) {
+      body.classList.add('overflow-visible');
+    }
+  });
+}
+
 export function wireStandardViewControls() {
   document.getElementById('db-search').addEventListener('input', debounce(renderDatabase, 120));
   document.getElementById('custom-add-btn').addEventListener('click', addCustom);
@@ -391,4 +415,7 @@ export function wireStandardViewControls() {
       renderDatabase();
     });
   });
+
+  wireBlockCollapse(document.getElementById('db-collapse-btn'), document.getElementById('db-block-body'));
+  wireBlockCollapse(document.getElementById('my-collapse-btn'), document.getElementById('my-block-body'));
 }
