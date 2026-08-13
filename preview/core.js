@@ -2,21 +2,39 @@ import { RACES } from './data/races.js';
 
 export const GRADES = ["A", "B", "C", "D", "E", "F", "G"];
 export const GRADE_INFO = {
-  A: { pct: "100%", tip: "Baseline. No penalty, safe to race here.", tier: "a" },
-  B: { pct: "-10%", tip: "Minor drag. One matching spark usually bumps this to A.", tier: "b" },
-  C: { pct: "-20%", tip: "Noticeable penalty. Worth 4-6 sparks before racing seriously.", tier: "c" },
-  D: { pct: "-40%", tip: "Steep drop. Push through only if the trophy is required. Needs 7-9 sparks.", tier: "d" },
-  E: { pct: "-60%", tip: "Severe — accel takes a hit too on distance. Avoid unless mandatory. Needs atleast 10 sparks.", tier: "e" },
-  F: { pct: "-80%", tip: "Near-crippling. Even max sparks (12) only gives you to C. Hope that Inspiration sessions gives you more.", tier: "f" },
-  G: { pct: "-90%", tip: "Worst case. Only for a must-have trophy. Even max sparks (12) only gives you to C. Hope that Inspiration sessions gives you more.", tier: "g" },
+  A: { tier: "a" },
+  B: { tier: "b" },
+  C: { tier: "c" },
+  D: { tier: "d" },
+  E: { tier: "e" },
+  F: { tier: "f" },
+  G: { tier: "g" },
+};
+export const GRADE_TIP_SURFACE = {
+  A: { pct: "100%", tip: "Baseline acceleration. No penalty, safe to race here." },
+  B: { pct: "-10%", tip: "≈-0.03 to -0.05 m/s² acceleration. One matching spark usually bumps this to A." },
+  C: { pct: "-20%", tip: "≈-0.07 to -0.09 m/s² acceleration. Worth 4-6 sparks before racing seriously." },
+  D: { pct: "-30%", tip: "≈-0.10 to -0.14 m/s² acceleration. Push through only if the trophy is required. Needs 7-9 sparks." },
+  E: { pct: "-50%", tip: "≈-0.16 to -0.23 m/s² acceleration — severe. Avoid unless mandatory. Needs atleast 10 sparks." },
+  F: { pct: "-70%", tip: "≈-0.23 to -0.33 m/s² acceleration — near-crippling. Even max sparks (12) only gives you to C." },
+  G: { pct: "-90%", tip: "≈-0.30 to -0.42 m/s² acceleration — worst case. Only for a must-have trophy. Even max sparks (12) only gives you to C." },
+};
+export const GRADE_TIP_DISTANCE = {
+  A: { pct: "100%", tip: "Baseline. No penalty to late-race speed or acceleration." },
+  B: { pct: "-10%", tip: "≈-0.11 to -0.15 m/s late-race speed. Acceleration still unaffected. One matching spark usually bumps this to A." },
+  C: { pct: "-20%", tip: "≈-0.22 to -0.31 m/s late-race speed. Acceleration still unaffected. Worth 4-6 sparks before racing seriously." },
+  D: { pct: "-40%", tip: "≈-0.44 to -0.62 m/s late-race speed. Acceleration still holds. Push through only if the trophy is required. Needs 7-9 sparks." },
+  E: { pct: "-60%", tip: "≈-0.66 to -0.93 m/s late-race speed, plus ≈-0.13 to -0.19 m/s² acceleration now too. Avoid unless mandatory. Needs atleast 10 sparks." },
+  F: { pct: "-80%", tip: "≈-0.88 to -1.24 m/s late-race speed, plus ≈-0.16 to -0.23 m/s² acceleration. Even max sparks (12) only gives you to C." },
+  G: { pct: "-90%", tip: "≈-0.99 to -1.39 m/s late-race speed, plus ≈-0.20 to -0.28 m/s² acceleration. Worst case — only for a must-have trophy. Even max sparks (12) only gives you to C." },
 };
 export const CATS = [
-  { key: "turf", label: "Turf", group: "surface", stat: "Power / Acceleration" },
-  { key: "dirt", label: "Dirt", group: "surface", stat: "Power / Acceleration" },
-  { key: "sprint", label: "Sprint", group: "distance", stat: "Speed" },
-  { key: "mile", label: "Mile", group: "distance", stat: "Speed" },
-  { key: "medium", label: "Medium", group: "distance", stat: "Speed" },
-  { key: "long", label: "Long", group: "distance", stat: "Speed" },
+  { key: "turf", label: "Turf", group: "surface", stat: "Acceleration" },
+  { key: "dirt", label: "Dirt", group: "surface", stat: "Acceleration" },
+  { key: "sprint", label: "Sprint", group: "distance", stat: "Late-race Speed" },
+  { key: "mile", label: "Mile", group: "distance", stat: "Late-race Speed" },
+  { key: "medium", label: "Medium", group: "distance", stat: "Late-race Speed" },
+  { key: "long", label: "Long", group: "distance", stat: "Late-race Speed" },
 ];
 export const SURFACE_KEYS = ["turf", "dirt"];
 export const DISTANCE_KEYS = ["sprint", "mile", "medium", "long"];
@@ -249,10 +267,12 @@ export function showTooltip(target, catKey, aptValue) {
   const grade = gradeOf(aptValue);
   const alt = altOf(aptValue);
   const info = GRADE_INFO[grade];
+  const tipTable = cat.group === 'surface' ? GRADE_TIP_SURFACE : GRADE_TIP_DISTANCE;
+  const tip = tipTable[grade];
   let html = `
     <div class="tt-head" style="color:var(--${info.tier}-text)">${cat.label} — ${grade}${alt ? ' / ' + alt.alt : ''}</div>
-    <div class="tt-stat">${cat.stat} · ${info.pct}</div>
-    <div>${info.tip}</div>
+    <div class="tt-stat">${cat.stat} · ${tip.pct}</div>
+    <div>${tip.tip}</div>
   `;
   if (alt) {
     html += `<div class="tt-variant">${escapeHtml(alt.note)}</div>`;

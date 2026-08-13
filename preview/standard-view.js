@@ -8,6 +8,10 @@ import { calPageHtml, wireCalPage, calGradeColor, CAL_YEAR_GROUPS } from './cale
 import { renderMainView } from './main.js';
 
 export let dbSort = "default";
+export const DB_PAGE_SIZE = 30;
+let dbPage = 1;
+export const MY_PAGE_SIZE = 5;
+let myPage = 1;
 
 const openInlineCals = new Set();
 const inlineCalTab = {};
@@ -30,10 +34,15 @@ export function renderDatabase() {
   const list = sortRowsByMode(DATABASE.filter(d => d.name.toLowerCase().includes(filter)), dbSort);
   document.getElementById('db-count').textContent = `${list.length}/${DATABASE.length}`;
 
+  const totalPages = Math.max(1, Math.ceil(list.length / DB_PAGE_SIZE));
+  if (dbPage > totalPages) dbPage = totalPages;
+  if (dbPage < 1) dbPage = 1;
+  const pageList = list.slice((dbPage - 1) * DB_PAGE_SIZE, dbPage * DB_PAGE_SIZE);
+
   const addedNames = new Set(state.myList.map(t => t.name.toLowerCase()));
   const indexByName = new Map(DATABASE.map((d, i) => [d.name, i]));
 
-  grid.innerHTML = list.map((d) => {
+  grid.innerHTML = pageList.map((d) => {
     const realIndex = indexByName.get(d.name);
     const already = addedNames.has(d.name.toLowerCase());
     return `
@@ -50,6 +59,30 @@ export function renderDatabase() {
 
   wireChips(grid);
   wireDbGridActions(grid);
+  renderPagination('db-pagination-top', 'db-pagination-bottom', dbPage, totalPages, (delta) => {
+    dbPage += delta;
+    renderDatabase();
+  }, 'db-grid');
+}
+
+function renderPagination(topId, bottomId, page, totalPages, onGoToPage, scrollTargetId) {
+  [topId, bottomId].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (totalPages <= 1) { el.innerHTML = ""; return; }
+    el.innerHTML = `
+      <button class="btn small" data-page-action="prev" ${page <= 1 ? 'disabled' : ''}>‹ Prev</button>
+      <span class="db-page-info">Page ${page} of ${totalPages}</span>
+      <button class="btn small" data-page-action="next" ${page >= totalPages ? 'disabled' : ''}>Next ›</button>
+    `;
+    el.querySelectorAll('[data-page-action]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        onGoToPage(btn.dataset.pageAction === 'next' ? 1 : -1);
+        const target = document.getElementById(scrollTargetId);
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+  });
 }
 
 export function addToMyList(name, apt) {
@@ -67,14 +100,20 @@ export function renderMyList() {
   if (state.myList.length === 0) {
     emptyEl.style.display = "block";
     wrap.innerHTML = "";
+    renderPagination('my-pagination-top', 'my-pagination-bottom', 1, 1, () => {}, 'mylist');
     return;
   }
   emptyEl.style.display = "none";
 
-  wrap.innerHTML = state.myList.map(t => myCardHtml(t)).join("");
+  const totalPages = Math.max(1, Math.ceil(state.myList.length / MY_PAGE_SIZE));
+  if (myPage > totalPages) myPage = totalPages;
+  if (myPage < 1) myPage = 1;
+  const pageList = state.myList.slice((myPage - 1) * MY_PAGE_SIZE, myPage * MY_PAGE_SIZE);
+
+  wrap.innerHTML = pageList.map(t => myCardHtml(t)).join("");
   wireChips(wrap);
 
-  state.myList.forEach(t => {
+  pageList.forEach(t => {
     const delBtn = document.getElementById(`del-${t.id}`);
     if (delBtn) delBtn.addEventListener('click', () => removeFromMyList(t.id));
 
@@ -134,6 +173,11 @@ export function renderMyList() {
     const pageBox = document.getElementById(`calpage-${t.id}`);
     if (pageBox) wireCalPage(pageBox, t, renderMyList);
   });
+
+  renderPagination('my-pagination-top', 'my-pagination-bottom', myPage, totalPages, (delta) => {
+    myPage += delta;
+    renderMyList();
+  }, 'mylist');
 }
 
 export function findRaceByExactName(name) {
@@ -404,13 +448,17 @@ function wireBlockCollapse(toggleBtn, body) {
 }
 
 export function wireStandardViewControls() {
-  document.getElementById('db-search').addEventListener('input', debounce(renderDatabase, 120));
+  document.getElementById('db-search').addEventListener('input', debounce(() => {
+    dbPage = 1;
+    renderDatabase();
+  }, 120));
   document.getElementById('custom-add-btn').addEventListener('click', addCustom);
   document.getElementById('custom-name').addEventListener('keydown', e => { if (e.key === 'Enter') addCustom(); });
 
   document.querySelectorAll('#db-sort .sort-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       dbSort = btn.dataset.sort;
+      dbPage = 1;
       document.querySelectorAll('#db-sort .sort-btn').forEach(b => b.classList.toggle('active', b === btn));
       renderDatabase();
     });
