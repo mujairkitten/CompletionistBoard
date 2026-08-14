@@ -2,21 +2,39 @@ import { RACES } from './data/races.js';
 
 export const GRADES = ["A", "B", "C", "D", "E", "F", "G"];
 export const GRADE_INFO = {
-  A: { pct: "100%", tip: "Baseline. No penalty, safe to race here.", tier: "a" },
-  B: { pct: "-10%", tip: "Minor drag. One matching spark usually bumps this to A.", tier: "b" },
-  C: { pct: "-20%", tip: "Noticeable penalty. Worth 4-6 sparks before racing seriously.", tier: "c" },
-  D: { pct: "-40%", tip: "Steep drop. Push through only if the trophy is required. Needs 7-9 sparks.", tier: "d" },
-  E: { pct: "-60%", tip: "Severe — accel takes a hit too on distance. Avoid unless mandatory. Needs atleast 10 sparks.", tier: "e" },
-  F: { pct: "-80%", tip: "Near-crippling. Even max sparks (12) only gives you to C. Hope that Inspiration sessions gives you more.", tier: "f" },
-  G: { pct: "-90%", tip: "Worst case. Only for a must-have trophy. Even max sparks (12) only gives you to C. Hope that Inspiration sessions gives you more.", tier: "g" },
+  A: { tier: "a" },
+  B: { tier: "b" },
+  C: { tier: "c" },
+  D: { tier: "d" },
+  E: { tier: "e" },
+  F: { tier: "f" },
+  G: { tier: "g" },
+};
+export const GRADE_TIP_SURFACE = {
+  A: { pct: "100%", tip: "Baseline acceleration. No penalty, safe to race here." },
+  B: { pct: "-10%", tip: "≈-0.03 to -0.05 m/s² acceleration. One matching spark usually bumps this to A." },
+  C: { pct: "-20%", tip: "≈-0.07 to -0.09 m/s² acceleration. Worth 4-6 sparks before racing seriously." },
+  D: { pct: "-30%", tip: "≈-0.10 to -0.14 m/s² acceleration. Push through only if the trophy is required. Needs 7-9 sparks." },
+  E: { pct: "-50%", tip: "≈-0.16 to -0.23 m/s² acceleration — severe. Avoid unless mandatory. Needs atleast 10 sparks." },
+  F: { pct: "-70%", tip: "≈-0.23 to -0.33 m/s² acceleration — near-crippling. Even max sparks (12) only gives you to C." },
+  G: { pct: "-90%", tip: "≈-0.30 to -0.42 m/s² acceleration — worst case. Only for a must-have trophy. Even max sparks (12) only gives you to C." },
+};
+export const GRADE_TIP_DISTANCE = {
+  A: { pct: "100%", tip: "Baseline. No penalty to late-race speed or acceleration." },
+  B: { pct: "-10%", tip: "≈-0.11 to -0.15 m/s late-race speed. Acceleration still unaffected. One matching spark usually bumps this to A." },
+  C: { pct: "-20%", tip: "≈-0.22 to -0.31 m/s late-race speed. Acceleration still unaffected. Worth 4-6 sparks before racing seriously." },
+  D: { pct: "-40%", tip: "≈-0.44 to -0.62 m/s late-race speed. Acceleration still holds. Push through only if the trophy is required. Needs 7-9 sparks." },
+  E: { pct: "-60%", tip: "≈-0.66 to -0.93 m/s late-race speed, plus ≈-0.13 to -0.19 m/s² acceleration now too. Avoid unless mandatory. Needs atleast 10 sparks." },
+  F: { pct: "-80%", tip: "≈-0.88 to -1.24 m/s late-race speed, plus ≈-0.16 to -0.23 m/s² acceleration. Even max sparks (12) only gives you to C." },
+  G: { pct: "-90%", tip: "≈-0.99 to -1.39 m/s late-race speed, plus ≈-0.20 to -0.28 m/s² acceleration. Worst case — only for a must-have trophy. Even max sparks (12) only gives you to C." },
 };
 export const CATS = [
-  { key: "turf", label: "Turf", group: "surface", stat: "Power / Acceleration" },
-  { key: "dirt", label: "Dirt", group: "surface", stat: "Power / Acceleration" },
-  { key: "sprint", label: "Sprint", group: "distance", stat: "Speed" },
-  { key: "mile", label: "Mile", group: "distance", stat: "Speed" },
-  { key: "medium", label: "Medium", group: "distance", stat: "Speed" },
-  { key: "long", label: "Long", group: "distance", stat: "Speed" },
+  { key: "turf", label: "Turf", group: "surface", stat: "Acceleration" },
+  { key: "dirt", label: "Dirt", group: "surface", stat: "Acceleration" },
+  { key: "sprint", label: "Sprint", group: "distance", stat: "Late-race Speed" },
+  { key: "mile", label: "Mile", group: "distance", stat: "Late-race Speed" },
+  { key: "medium", label: "Medium", group: "distance", stat: "Late-race Speed" },
+  { key: "long", label: "Long", group: "distance", stat: "Late-race Speed" },
 ];
 export const SURFACE_KEYS = ["turf", "dirt"];
 export const DISTANCE_KEYS = ["sprint", "mile", "medium", "long"];
@@ -29,7 +47,6 @@ const MAX_TROPHIES_PER_TRAINEE = 300;
 function defaultSettings() {
   return {
     allowCustomTrainees: true,
-    allowRaceSearch: true,
     allowCustomTrophies: true,
     calendarViewMode: false,
     lightMode: false,
@@ -46,6 +63,14 @@ export let state = {
 let saveQueue = Promise.resolve();
 
 export function uid() { return Math.random().toString(36).slice(2, 9); }
+
+export function debounce(fn, delay = 150) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -150,11 +175,10 @@ function normalizeTrainee(value, usedTraineeIds) {
 function normalizeSettings(value, trainees) {
   const raw = isPlainObject(value) ? value : {};
   const settings = defaultSettings();
-  for (const key of ['allowCustomTrainees', 'allowRaceSearch', 'allowCustomTrophies', 'calendarViewMode', 'lightMode']) {
+  for (const key of ['allowCustomTrainees', 'allowCustomTrophies', 'calendarViewMode', 'lightMode']) {
     if (typeof raw[key] === 'boolean') settings[key] = raw[key];
   }
   settings.colorTheme = raw.colorTheme === 'dirt' ? 'dirt' : 'turf';
-  if (!settings.allowRaceSearch) settings.allowCustomTrophies = true;
   if (typeof raw.activeTraineeId === 'string' && trainees.some(t => t.id === raw.activeTraineeId)) {
     settings.activeTraineeId = raw.activeTraineeId;
   }
@@ -226,23 +250,10 @@ export function gradeOf(v) { return typeof v === 'string' ? v : v.base; }
 export function altOf(v) { return typeof v === 'string' ? null : v; }
 
 export const tooltipEl = document.getElementById('tooltip');
-export function showTooltip(target, catKey, aptValue) {
-  const cat = CATS.find(c => c.key === catKey);
-  const grade = gradeOf(aptValue);
-  const alt = altOf(aptValue);
-  const info = GRADE_INFO[grade];
-  let html = `
-    <div class="tt-head" style="color:var(--${info.tier})">${cat.label} — ${grade}${alt ? ' / ' + alt.alt : ''}</div>
-    <div class="tt-stat">${cat.stat} · ${info.pct}</div>
-    <div>${info.tip}</div>
-  `;
-  if (alt) {
-    html += `<div class="tt-variant">${escapeHtml(alt.note)}</div>`;
-  }
-  tooltipEl.innerHTML = html;
-
+function positionTooltip(target) {
   const rect = target.getBoundingClientRect();
-  tooltipEl.style.left = Math.min(rect.left, window.innerWidth - 236) + "px";
+  const tooltipWidth = tooltipEl.getBoundingClientRect().width;
+  tooltipEl.style.left = Math.min(rect.left, window.innerWidth - tooltipWidth - 16) + "px";
 
   const gap = 8;
   const tooltipHeight = tooltipEl.getBoundingClientRect().height;
@@ -250,6 +261,34 @@ export function showTooltip(target, catKey, aptValue) {
   if (top < gap) top = rect.bottom + gap;
   tooltipEl.style.top = top + "px";
   tooltipEl.classList.add('show');
+}
+export function showTooltip(target, catKey, aptValue) {
+  const cat = CATS.find(c => c.key === catKey);
+  const grade = gradeOf(aptValue);
+  const alt = altOf(aptValue);
+  const info = GRADE_INFO[grade];
+  const tipTable = cat.group === 'surface' ? GRADE_TIP_SURFACE : GRADE_TIP_DISTANCE;
+  const tip = tipTable[grade];
+  let html = `
+    <div class="tt-head" style="color:var(--${info.tier}-text)">${cat.label} — ${grade}${alt ? ' / ' + alt.alt : ''}</div>
+    <div class="tt-stat">${cat.stat} · ${tip.pct}</div>
+    <div>${tip.tip}</div>
+  `;
+  if (alt) {
+    html += `<div class="tt-variant">${escapeHtml(alt.note)}</div>`;
+  }
+  tooltipEl.style.width = '';
+  tooltipEl.style.maxWidth = '';
+  tooltipEl.style.borderTopColor = `var(--${info.tier})`;
+  tooltipEl.innerHTML = html;
+  positionTooltip(target);
+}
+export function showTextTooltip(target, text) {
+  tooltipEl.style.width = 'auto';
+  tooltipEl.style.maxWidth = '200px';
+  tooltipEl.style.borderTopColor = '';
+  tooltipEl.innerHTML = `<div>${escapeHtml(text)}</div>`;
+  positionTooltip(target);
 }
 export function hideTooltip() { tooltipEl.classList.remove('show'); }
 
@@ -279,20 +318,67 @@ export function aptGroupsHtml(apt) {
     <div class="apt-container">${DISTANCE_KEYS.map(k => chipHtml(apt, k)).join("")}</div>
   </div>`;
 }
+const chipWiredRoots = new WeakSet();
+
 export function wireChips(root) {
-  root.querySelectorAll('.trainee-icon img').forEach(img => {
-    img.addEventListener('error', () => {
-      img.style.display = 'none';
-      const fallback = img.nextElementSibling;
-      if (fallback) fallback.style.display = 'flex';
-    });
+  if (chipWiredRoots.has(root)) return;
+  chipWiredRoots.add(root);
+
+  root.addEventListener('error', (e) => {
+    const img = e.target;
+    if (!(img instanceof HTMLImageElement) || !img.matches('.trainee-icon img')) return;
+    img.style.display = 'none';
+    const fallback = img.nextElementSibling;
+    if (fallback) fallback.style.display = 'flex';
+  }, true);
+
+  root.addEventListener('mouseover', (e) => {
+    const chip = e.target.closest('.chip');
+    if (chip && root.contains(chip)) {
+      if (chip.contains(e.relatedTarget)) return;
+      showTooltip(chip, chip.dataset.cat, JSON.parse(chip.dataset.json));
+      return;
+    }
+    const iconBtn = e.target.closest('.icon-pill-btn[data-tooltip]');
+    if (iconBtn && root.contains(iconBtn)) {
+      if (iconBtn.contains(e.relatedTarget)) return;
+      showTextTooltip(iconBtn, iconBtn.dataset.tooltip);
+    }
   });
-  root.querySelectorAll('.chip').forEach(p => {
-    const value = JSON.parse(p.dataset.json);
-    p.addEventListener('mouseenter', () => showTooltip(p, p.dataset.cat, value));
-    p.addEventListener('mouseleave', hideTooltip);
-    p.addEventListener('focus', () => showTooltip(p, p.dataset.cat, value));
-    p.addEventListener('blur', hideTooltip);
+  root.addEventListener('mouseout', (e) => {
+    const chip = e.target.closest('.chip');
+    if (chip && root.contains(chip)) {
+      if (chip.contains(e.relatedTarget)) return;
+      hideTooltip();
+      return;
+    }
+    const iconBtn = e.target.closest('.icon-pill-btn[data-tooltip]');
+    if (iconBtn && root.contains(iconBtn)) {
+      if (iconBtn.contains(e.relatedTarget)) return;
+      hideTooltip();
+    }
+  });
+  root.addEventListener('focusin', (e) => {
+    const chip = e.target.closest('.chip');
+    if (chip && root.contains(chip)) {
+      showTooltip(chip, chip.dataset.cat, JSON.parse(chip.dataset.json));
+      return;
+    }
+    const iconBtn = e.target.closest('.icon-pill-btn[data-tooltip]');
+    if (iconBtn && root.contains(iconBtn)) {
+      showTextTooltip(iconBtn, iconBtn.dataset.tooltip);
+    }
+  });
+  root.addEventListener('focusout', (e) => {
+    const chip = e.target.closest('.chip');
+    if (chip && root.contains(chip)) {
+      hideTooltip();
+      return;
+    }
+    const iconBtn = e.target.closest('.icon-pill-btn[data-tooltip]');
+    if (iconBtn && root.contains(iconBtn)) {
+      hideTooltip();
+    }
   });
 }
 

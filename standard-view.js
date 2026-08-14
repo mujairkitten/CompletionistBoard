@@ -2,26 +2,47 @@ import { DATABASE } from './data/database.js';
 import { RACES, TRACK_TO_APT_KEY, DIST_TO_APT_KEY } from './data/races.js';
 import {
   state, saveState, uid, escapeHtml, gradeOf, GRADE_INFO, normalizeImportedTrainees,
-  aptGroupsHtml, wireChips, iconHtml, weakAptitudes, sortRowsByMode, raceDateLabel
+  aptGroupsHtml, wireChips, iconHtml, weakAptitudes, sortRowsByMode, raceDateLabel, debounce
 } from './core.js';
 import { calPageHtml, wireCalPage, calGradeColor, CAL_YEAR_GROUPS } from './calendar.js';
+import { renderMainView } from './main.js';
 
 export let dbSort = "default";
+export const DB_PAGE_SIZE = 30;
+let dbPage = 1;
+export const MY_PAGE_SIZE = 5;
+let myPage = 1;
 
 const openInlineCals = new Set();
 const inlineCalTab = {};
+
+let dbGridActionsWired = false;
+function wireDbGridActions(grid) {
+  if (dbGridActionsWired) return;
+  dbGridActionsWired = true;
+  grid.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-add]');
+    if (!btn || btn.disabled) return;
+    const d = DATABASE[parseInt(btn.dataset.add, 10)];
+    addToMyList(d.name, JSON.parse(JSON.stringify(d.apt)));
+  });
+}
 
 export function renderDatabase() {
   const grid = document.getElementById('db-grid');
   const filter = document.getElementById('db-search').value.trim().toLowerCase();
   const list = sortRowsByMode(DATABASE.filter(d => d.name.toLowerCase().includes(filter)), dbSort);
-  document.getElementById('db-count').textContent = `${list.length} / ${DATABASE.length}`;
-  document.getElementById('db-gate').textContent = DATABASE.length;
+  document.getElementById('db-count').textContent = `${list.length}/${DATABASE.length}`;
+
+  const totalPages = Math.max(1, Math.ceil(list.length / DB_PAGE_SIZE));
+  if (dbPage > totalPages) dbPage = totalPages;
+  if (dbPage < 1) dbPage = 1;
+  const pageList = list.slice((dbPage - 1) * DB_PAGE_SIZE, dbPage * DB_PAGE_SIZE);
 
   const addedNames = new Set(state.myList.map(t => t.name.toLowerCase()));
   const indexByName = new Map(DATABASE.map((d, i) => [d.name, i]));
 
-  grid.innerHTML = list.map((d) => {
+  grid.innerHTML = pageList.map((d) => {
     const realIndex = indexByName.get(d.name);
     const already = addedNames.has(d.name.toLowerCase());
     return `
@@ -37,10 +58,29 @@ export function renderDatabase() {
   }).join("");
 
   wireChips(grid);
-  grid.querySelectorAll('[data-add]:not([disabled])').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const d = DATABASE[parseInt(btn.dataset.add, 10)];
-      addToMyList(d.name, JSON.parse(JSON.stringify(d.apt)));
+  wireDbGridActions(grid);
+  renderPagination('db-pagination-top', 'db-pagination-bottom', dbPage, totalPages, (delta) => {
+    dbPage += delta;
+    renderDatabase();
+  }, 'db-grid');
+}
+
+function renderPagination(topId, bottomId, page, totalPages, onGoToPage, scrollTargetId) {
+  [topId, bottomId].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (totalPages <= 1) { el.innerHTML = ""; return; }
+    el.innerHTML = `
+      <button class="btn small" data-page-action="prev" ${page <= 1 ? 'disabled' : ''}>‹ Prev</button>
+      <span class="db-page-info">Page ${page} of ${totalPages}</span>
+      <button class="btn small" data-page-action="next" ${page >= totalPages ? 'disabled' : ''}>Next ›</button>
+    `;
+    el.querySelectorAll('[data-page-action]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        onGoToPage(btn.dataset.pageAction === 'next' ? 1 : -1);
+        const target = document.getElementById(scrollTargetId);
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
     });
   });
 }
@@ -55,19 +95,25 @@ export function addToMyList(name, apt) {
 export function renderMyList() {
   const wrap = document.getElementById('mylist');
   const emptyEl = document.getElementById('mylist-empty');
-  document.getElementById('my-gate').textContent = state.myList.length;
+  document.getElementById('my-count').textContent = `${state.myList.length}/${DATABASE.length}`;
 
   if (state.myList.length === 0) {
     emptyEl.style.display = "block";
     wrap.innerHTML = "";
+    renderPagination('my-pagination-top', 'my-pagination-bottom', 1, 1, () => {}, 'mylist');
     return;
   }
   emptyEl.style.display = "none";
 
-  wrap.innerHTML = state.myList.map(t => myCardHtml(t)).join("");
+  const totalPages = Math.max(1, Math.ceil(state.myList.length / MY_PAGE_SIZE));
+  if (myPage > totalPages) myPage = totalPages;
+  if (myPage < 1) myPage = 1;
+  const pageList = state.myList.slice((myPage - 1) * MY_PAGE_SIZE, myPage * MY_PAGE_SIZE);
+
+  wrap.innerHTML = pageList.map(t => myCardHtml(t)).join("");
   wireChips(wrap);
 
-  state.myList.forEach(t => {
+  pageList.forEach(t => {
     const delBtn = document.getElementById(`del-${t.id}`);
     if (delBtn) delBtn.addEventListener('click', () => removeFromMyList(t.id));
 
@@ -90,17 +136,15 @@ export function renderMyList() {
           hideSuggestBox(suggestBox);
         }
       });
-      if (state.settings.allowRaceSearch) {
-        addTInput.addEventListener('input', () => {
-          renderRaceSuggestions(t, addTInput.value, suggestBox, addTInput);
-        });
-        addTInput.addEventListener('focus', () => {
-          renderRaceSuggestions(t, addTInput.value, suggestBox, addTInput);
-        });
-        addTInput.addEventListener('blur', () => {
-          setTimeout(() => hideSuggestBox(suggestBox), 150);
-        });
-      }
+      addTInput.addEventListener('input', () => {
+        renderRaceSuggestions(t, addTInput.value, suggestBox, addTInput);
+      });
+      addTInput.addEventListener('focus', () => {
+        renderRaceSuggestions(t, addTInput.value, suggestBox, addTInput);
+      });
+      addTInput.addEventListener('blur', () => {
+        setTimeout(() => hideSuggestBox(suggestBox), 150);
+      });
     }
 
     t.trophies.forEach(tr => {
@@ -129,6 +173,11 @@ export function renderMyList() {
     const pageBox = document.getElementById(`calpage-${t.id}`);
     if (pageBox) wireCalPage(pageBox, t, renderMyList);
   });
+
+  renderPagination('my-pagination-top', 'my-pagination-bottom', myPage, totalPages, (delta) => {
+    myPage += delta;
+    renderMyList();
+  }, 'mylist');
 }
 
 export function findRaceByExactName(name) {
@@ -141,7 +190,10 @@ export function raceMeta(race) {
 }
 
 function hideSuggestBox(box) {
-  if (box) box.classList.remove('show');
+  if (!box) return;
+  box.classList.remove('show');
+  const card = box.closest('.mycard');
+  if (card) card.classList.remove('suggest-open');
 }
 
 function renderRaceSuggestions(trainee, query, box, inputEl) {
@@ -177,6 +229,8 @@ function renderRaceSuggestions(trainee, query, box, inputEl) {
     }).join("");
   }
   box.classList.add('show');
+  const openCard = box.closest('.mycard');
+  if (openCard) openCard.classList.add('suggest-open');
 
   box.querySelectorAll('.race-suggest-item').forEach(item => {
     item.addEventListener('mousedown', (e) => {
@@ -194,10 +248,6 @@ function renderRaceSuggestions(trainee, query, box, inputEl) {
 export function addTrophyFromInput(tid, rawName) {
   const name = (rawName || "").trim();
   if (!name) return;
-  if (!state.settings.allowRaceSearch) {
-    addTrophy(tid, name, null);
-    return;
-  }
   const race = findRaceByExactName(name);
   if (!race && !state.settings.allowCustomTrophies) return;
   addTrophy(tid, name, race ? raceMeta(race) : null);
@@ -258,7 +308,7 @@ function myCardHtml(t) {
         <div class="cal-tabs" id="caltabs-${t.id}">
           ${inlineTabs.map(tab => `<button class="cal-tab-btn ${inlineActiveTab === tab ? 'active' : ''}" data-tab="${tab}">${tab === "OoB" ? "Out-of-Bond" : tab}</button>`).join("")}
         </div>
-        <div class="cal-page" id="calpage-${t.id}">${calPageHtml(t, inlineActiveTab)}</div>
+        <div class="cal-page" id="calpage-${t.id}">${calPageHtml(t, inlineActiveTab, { showAdd: true })}</div>
       </div>
     </div>`;
 
@@ -279,9 +329,9 @@ function myCardHtml(t) {
       </div>
       <div class="trophy-list">${trophyHtml}</div>
       <div class="add-trophy">
-        <input type="text" id="addt-input-${t.id}" placeholder="${!state.settings.allowRaceSearch ? 'Add a custom trophy' : (state.settings.allowCustomTrophies ? 'Search races (G1-G3) or type a custom trophy' : 'Search races (G1-G3)')}" autocomplete="off">
+        <input type="text" id="addt-input-${t.id}" placeholder="Search races…" autocomplete="off">
         <button class="btn small" id="addt-btn-${t.id}">+ Add</button>
-        ${state.settings.allowRaceSearch ? `<div class="race-suggest" id="addt-suggest-${t.id}"></div>` : ""}
+        <div class="race-suggest" id="addt-suggest-${t.id}"></div>
       </div>
     </div>
     ${inlineCalHtml}
@@ -328,54 +378,92 @@ export function addCustom() {
   input.value = "";
 }
 
+function backupFilename() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const yy = pad(d.getFullYear() % 100);
+  const mm = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const mi = pad(d.getMinutes());
+  const ss = pad(d.getSeconds());
+  return `CompBoard-${yy}${mm}${dd}-${hh}${mi}${ss}.json`;
+}
 export function exportList() {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = "completionist-list.json";
+  a.href = url; a.download = backupFilename();
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+function importListFromJsonText(text) {
+  try {
+    const parsed = JSON.parse(text);
+    if (!parsed || !Array.isArray(parsed.myList)) throw new Error("bad format");
+    const knownNames = new Set(state.myList.map(trainee => trainee.name.toLocaleLowerCase()));
+    const trainees = normalizeImportedTrainees(parsed.myList, state.myList).filter(trainee => {
+      const key = trainee.name.toLocaleLowerCase();
+      if (knownNames.has(key)) return false;
+      knownNames.add(key);
+      return true;
+    });
+    state.myList.push(...trainees);
+    saveState(); renderMainView();
+    if (trainees.length !== parsed.myList.length) {
+      alert(`Imported ${trainees.length} trainee${trainees.length === 1 ? '' : 's'}. Duplicate or invalid entries were skipped.`);
+    }
+    return true;
+  } catch (e) {
+    alert("Couldn't read that — expected a Completionist Board export.");
+    return false;
+  }
+}
+export function importListFromText(text) {
+  return importListFromJsonText(text);
+}
 export function importList(file) {
   const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const parsed = JSON.parse(reader.result);
-      if (!parsed || !Array.isArray(parsed.myList)) throw new Error("bad format");
-      const knownNames = new Set(state.myList.map(trainee => trainee.name.toLocaleLowerCase()));
-      const trainees = normalizeImportedTrainees(parsed.myList, state.myList).filter(trainee => {
-        const key = trainee.name.toLocaleLowerCase();
-        if (knownNames.has(key)) return false;
-        knownNames.add(key);
-        return true;
-      });
-      state.myList.push(...trainees);
-      saveState(); renderMyList(); renderDatabase();
-      if (trainees.length !== parsed.myList.length) {
-        alert(`Imported ${trainees.length} trainee${trainees.length === 1 ? '' : 's'}. Duplicate or invalid entries were skipped.`);
-      }
-    } catch (e) {
-      alert("Couldn't read that file — expected a Completionist Board export.");
-    }
-  };
+  reader.onload = () => { importListFromJsonText(reader.result); };
   reader.readAsText(file);
 }
 
+function wireBlockCollapse(toggleBtn, body) {
+  if (!toggleBtn || !body) return;
+  toggleBtn.addEventListener('click', () => {
+    const willOpen = !body.classList.contains('open');
+    if (!willOpen) {
+      body.classList.remove('overflow-visible');
+    }
+    body.classList.toggle('open', willOpen);
+    const arrow = toggleBtn.querySelector('.cal-trainee-arrow');
+    if (arrow) arrow.classList.toggle('open', willOpen);
+  });
+  body.addEventListener('transitionend', (e) => {
+    if (e.propertyName !== 'max-height') return;
+    if (body.classList.contains('open')) {
+      body.classList.add('overflow-visible');
+    }
+  });
+}
+
 export function wireStandardViewControls() {
-  document.getElementById('db-search').addEventListener('input', renderDatabase);
+  document.getElementById('db-search').addEventListener('input', debounce(() => {
+    dbPage = 1;
+    renderDatabase();
+  }, 120));
   document.getElementById('custom-add-btn').addEventListener('click', addCustom);
   document.getElementById('custom-name').addEventListener('keydown', e => { if (e.key === 'Enter') addCustom(); });
-  document.getElementById('export-btn').addEventListener('click', exportList);
-  document.getElementById('import-file').addEventListener('change', e => {
-    if (e.target.files[0]) importList(e.target.files[0]);
-    e.target.value = "";
-  });
 
   document.querySelectorAll('#db-sort .sort-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       dbSort = btn.dataset.sort;
+      dbPage = 1;
       document.querySelectorAll('#db-sort .sort-btn').forEach(b => b.classList.toggle('active', b === btn));
       renderDatabase();
     });
   });
+
+  wireBlockCollapse(document.getElementById('db-collapse-btn'), document.getElementById('db-block-body'));
+  wireBlockCollapse(document.getElementById('my-collapse-btn'), document.getElementById('my-block-body'));
 }
