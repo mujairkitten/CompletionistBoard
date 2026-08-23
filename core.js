@@ -38,7 +38,6 @@ export const CATS = [
 ];
 export const SURFACE_KEYS = ["turf", "dirt"];
 export const DISTANCE_KEYS = ["sprint", "mile", "medium", "long"];
-
 const SAFE_ID = /^[a-z0-9]{7}$/;
 const MAX_NAME_LENGTH = 120;
 const MAX_NOTE_LENGTH = 500;
@@ -54,16 +53,13 @@ function defaultSettings() {
     activeTraineeId: null
   };
 }
-
 export let state = {
   myList: [],
   settings: defaultSettings()
 };
-
 let saveQueue = Promise.resolve();
 
 export function uid() { return Math.random().toString(36).slice(2, 9); }
-
 export function debounce(fn, delay = 150) {
   let timer;
   return (...args) => {
@@ -71,22 +67,18 @@ export function debounce(fn, delay = 150) {
     timer = setTimeout(() => fn(...args), delay);
   };
 }
-
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
-
 function safeText(value, maxLength) {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
 }
-
 function nextId(usedIds) {
   let id;
   do { id = uid(); } while (usedIds.has(id));
   usedIds.add(id);
   return id;
 }
-
 function normalizedId(value, usedIds) {
   if (typeof value === 'string' && SAFE_ID.test(value) && !usedIds.has(value)) {
     usedIds.add(value);
@@ -94,7 +86,6 @@ function normalizedId(value, usedIds) {
   }
   return nextId(usedIds);
 }
-
 function normalizeAptitude(value) {
   if (typeof value === 'string') return GRADE_INFO[value] ? value : null;
   if (!isPlainObject(value) || !GRADE_INFO[value.base] || !GRADE_INFO[value.alt]) return null;
@@ -104,7 +95,6 @@ function normalizeAptitude(value) {
     note: safeText(value.note, MAX_NOTE_LENGTH)
   };
 }
-
 function normalizeAptitudes(value) {
   if (!isPlainObject(value)) return null;
   const aptitudes = {};
@@ -115,7 +105,6 @@ function normalizeAptitudes(value) {
   }
   return aptitudes;
 }
-
 function normalizeTrophy(value, usedIds) {
   if (!isPlainObject(value)) return null;
   const name = safeText(value.name, MAX_NAME_LENGTH);
@@ -136,33 +125,29 @@ function normalizeTrophy(value, usedIds) {
   }
   return trophy;
 }
-
 function normalizeCalendarOrder(value) {
   if (!isPlainObject(value)) return {};
   const validRaceNames = new Set(RACES.map(race => race.name));
   const order = {};
   for (const [slotKey, names] of Object.entries(value)) {
-    if (!Array.isArray(names) || !/^[A-Z][a-z]+\|(Early|Late)$/.test(slotKey)) continue;
+    if (!Array.isArray(names) || !/^[A-Z][a-z]+|(Early|Late)$/.test(slotKey)) continue;
     order[slotKey] = names
       .filter(name => typeof name === 'string' && validRaceNames.has(name))
       .slice(0, RACES.length);
   }
   return order;
 }
-
 function normalizeTrainee(value, usedTraineeIds) {
   if (!isPlainObject(value)) return null;
   const name = safeText(value.name, MAX_NAME_LENGTH);
   const aptitudes = normalizeAptitudes(value.aptitudes);
   if (!name || !aptitudes) return null;
-
   const usedTrophyIds = new Set();
   const trophies = Array.isArray(value.trophies)
     ? value.trophies.slice(0, MAX_TROPHIES_PER_TRAINEE)
       .map(trophy => normalizeTrophy(trophy, usedTrophyIds))
       .filter(Boolean)
     : [];
-
   return {
     id: normalizedId(value.id, usedTraineeIds),
     name,
@@ -171,7 +156,6 @@ function normalizeTrainee(value, usedTraineeIds) {
     calendarOrder: normalizeCalendarOrder(value.calendarOrder)
   };
 }
-
 function normalizeSettings(value, trainees) {
   const raw = isPlainObject(value) ? value : {};
   const settings = defaultSettings();
@@ -184,27 +168,23 @@ function normalizeSettings(value, trainees) {
   }
   return settings;
 }
-
 function normalizeTraineeList(value, usedTraineeIds = new Set()) {
   if (!Array.isArray(value)) return [];
   return value
     .map(trainee => normalizeTrainee(trainee, usedTraineeIds))
     .filter(Boolean);
 }
-
 export function normalizeImportedTrainees(value, existingTrainees = []) {
   const usedTraineeIds = new Set(
     Array.isArray(existingTrainees) ? existingTrainees.map(t => t.id).filter(id => SAFE_ID.test(id)) : []
   );
   return normalizeTraineeList(value, usedTraineeIds);
 }
-
 function normalizeState(value) {
   const raw = isPlainObject(value) ? value : {};
   const myList = normalizeTraineeList(raw.myList);
   return { myList, settings: normalizeSettings(raw.settings, myList) };
 }
-
 export async function loadState() {
   try {
     if (window.storage && typeof window.storage.get === 'function') {
@@ -217,7 +197,6 @@ export async function loadState() {
   } catch (e) { console.error("Storage load failed", e); }
   state = normalizeState(state);
 }
-
 export function saveState() {
   let snapshot;
   try {
@@ -226,7 +205,6 @@ export function saveState() {
     console.error("Storage serialization failed", e);
     return Promise.resolve();
   }
-
   saveQueue = saveQueue.catch(() => {}).then(async () => {
     try {
       if (window.storage && typeof window.storage.set === 'function') {
@@ -240,7 +218,6 @@ export function saveState() {
   });
   return saveQueue;
 }
-
 export function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
@@ -248,13 +225,11 @@ export function escapeHtml(str) {
 }
 export function gradeOf(v) { return typeof v === 'string' ? v : v.base; }
 export function altOf(v) { return typeof v === 'string' ? null : v; }
-
 export const tooltipEl = document.getElementById('tooltip');
 function positionTooltip(target) {
   const rect = target.getBoundingClientRect();
   const tooltipWidth = tooltipEl.getBoundingClientRect().width;
   tooltipEl.style.left = Math.min(rect.left, window.innerWidth - tooltipWidth - 16) + "px";
-
   const gap = 8;
   const tooltipHeight = tooltipEl.getBoundingClientRect().height;
   let top = rect.top - tooltipHeight - gap;
@@ -269,11 +244,9 @@ export function showTooltip(target, catKey, aptValue) {
   const info = GRADE_INFO[grade];
   const tipTable = cat.group === 'surface' ? GRADE_TIP_SURFACE : GRADE_TIP_DISTANCE;
   const tip = tipTable[grade];
-  let html = `
-    <div class="tt-head" style="color:var(--${info.tier}-text)">${cat.label} — ${grade}${alt ? ' / ' + alt.alt : ''}</div>
-    <div class="tt-stat">${cat.stat} · ${tip.pct}</div>
-    <div>${tip.tip}</div>
-  `;
+  let html = `<div class="tt-head" style="color:var(--${info.tier}-text)">${cat.label} — ${grade}${alt ? ' / ' + alt.alt : ''}</div>
+  <div class="tt-stat">${cat.stat} · ${tip.pct}</div>
+  <div>${tip.tip}</div>`;
   if (alt) {
     html += `<div class="tt-variant">${escapeHtml(alt.note)}</div>`;
   }
@@ -291,7 +264,7 @@ export function showTextTooltip(target, text) {
   positionTooltip(target);
 }
 export function hideTooltip() { tooltipEl.classList.remove('show'); }
-
+export const CHEVRON_SVG = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 export function chipHtml(apt, key) {
   const cat = CATS.find(c => c.key === key);
   const value = apt[key];
@@ -308,22 +281,18 @@ export function chipHtml(apt, key) {
   }
   const style = `--chip-bg:${bg};--chip-border:${borderMix};--chip-glow:${glowMix};`;
   const safeJson = JSON.stringify(value).replace(/'/g, '&#39;');
-  return `<button class="chip" style="${style}"
-            data-cat="${key}" data-json='${safeJson}'
-          >${label}</button>`;
+  return `<button class="chip" style="${style}" data-cat="${key}" data-json='${safeJson}'>${label}</button>`;
 }
 export function aptGroupsHtml(apt) {
   return `<div class="apt-groups">
-    <div class="apt-container">${SURFACE_KEYS.map(k => chipHtml(apt, k)).join("")}</div>
-    <div class="apt-container">${DISTANCE_KEYS.map(k => chipHtml(apt, k)).join("")}</div>
-  </div>`;
+  <div class="apt-container">${SURFACE_KEYS.map(k => chipHtml(apt, k)).join("")}</div>
+  <div class="apt-container">${DISTANCE_KEYS.map(k => chipHtml(apt, k)).join("")}</div>
+</div>`;
 }
 const chipWiredRoots = new WeakSet();
-
 export function wireChips(root) {
   if (chipWiredRoots.has(root)) return;
   chipWiredRoots.add(root);
-
   root.addEventListener('error', (e) => {
     const img = e.target;
     if (!(img instanceof HTMLImageElement) || !img.matches('.trainee-icon img')) return;
@@ -331,7 +300,6 @@ export function wireChips(root) {
     const fallback = img.nextElementSibling;
     if (fallback) fallback.style.display = 'flex';
   }, true);
-
   root.addEventListener('mouseover', (e) => {
     const chip = e.target.closest('.chip');
     if (chip && root.contains(chip)) {
@@ -381,7 +349,6 @@ export function wireChips(root) {
     }
   });
 }
-
 export function slugify(name) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
@@ -389,9 +356,9 @@ export function iconHtml(name, size) {
   const slug = slugify(name);
   const initial = (name.trim()[0] || '?').toUpperCase();
   return `<div class="trainee-icon" style="--icon-size:${size}px">
-    <img src="icons/${slug}.png" alt="" loading="lazy">
-    <span class="icon-fallback">${initial}</span>
-  </div>`;
+  <img src="icons/${slug}.png" alt="" loading="lazy">
+  <span class="icon-fallback">${initial}</span>
+</div>`;
 }
 export function blankIconHtml(size) {
   return `<div class="trainee-icon trainee-icon-blank" style="--icon-size:${size}px"></div>`;
@@ -400,7 +367,6 @@ export function raceDateLabel(r) {
   const yearLabel = r.year.replace(/,\s*/g, '/');
   return `${yearLabel} ${r.turn} ${r.month}`;
 }
-
 export function weakAptitudes(apt) {
   const dThreshold = GRADES.indexOf("D");
   return CATS
@@ -408,7 +374,6 @@ export function weakAptitudes(apt) {
     .filter(c => GRADES.indexOf(c.grade) >= dThreshold)
     .sort((a, b) => GRADES.indexOf(b.grade) - GRADES.indexOf(a.grade));
 }
-
 export function sortRowsByMode(rows, mode) {
   if (mode === "az") return [...rows].sort((a, b) => a.name.localeCompare(b.name));
   if (mode === "za") return [...rows].sort((a, b) => b.name.localeCompare(a.name));

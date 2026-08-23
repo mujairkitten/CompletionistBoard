@@ -16,6 +16,14 @@ let myPage = 1;
 const openInlineCals = new Set();
 const inlineCalTab = {};
 
+function traineeNameKey(name) {
+  return (name || "")
+    .normalize('NFKC')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLocaleLowerCase();
+}
+
 let dbGridActionsWired = false;
 function wireDbGridActions(grid) {
   if (dbGridActionsWired) return;
@@ -86,7 +94,11 @@ function renderPagination(topId, bottomId, page, totalPages, onGoToPage, scrollT
 }
 
 export function addToMyList(name, apt) {
-  state.myList.push({ id: uid(), name, aptitudes: apt, trophies: [] });
+  const normalizedName = traineeNameKey(name);
+  if (!normalizedName) return;
+  if (state.myList.some(t => traineeNameKey(t.name) === normalizedName)) return;
+  const canonicalName = name.normalize('NFKC').trim().replace(/\s+/g, ' ');
+  state.myList.push({ id: uid(), name: canonicalName, aptitudes: apt, trophies: [] });
   saveState();
   renderMyList();
   renderDatabase();
@@ -347,6 +359,8 @@ export function addTrophy(tid, name, meta) {
   if (!name) return;
   const t = state.myList.find(x => x.id === tid);
   if (!t) return;
+  const normalizedName = name.toLowerCase();
+  if (t.trophies.some(tr => tr.name.toLowerCase() === normalizedName)) return;
   const trophy = { id: uid(), name, checked: false };
   if (meta) {
     trophy.grade = meta.grade; trophy.track = meta.track; trophy.distance = meta.distance;

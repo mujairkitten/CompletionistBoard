@@ -13,7 +13,6 @@
   --accent2: #2bcfa8;
   --accent-rgb: 34, 181, 115;
   --accent2-rgb: 43, 207, 168;
-
   --glass-bg: rgba(23, 26, 34, .72);
   --glass-bg-soft: rgba(23, 26, 34, .65);
   --glass-border: rgba(255, 255, 255, .09);
@@ -54,7 +53,6 @@ body.light {
   --accent2: #187560;
   --accent-rgb: 24, 122, 77;
   --accent2-rgb: 24, 117, 96;
-
   --glass-bg: var(--bg-alt);
   --glass-bg-soft: var(--panel);
   --glass-border: var(--line);
@@ -83,10 +81,12 @@ body.light.dirt {
   --accent-rgb: 156, 106, 10;
   --accent2-rgb: 168, 90, 46;
 }
-
 * {
   box-sizing: border-box;
   transition: background-color .3s ease, color .3s ease, border-color .3s ease, box-shadow .3s ease, fill .3s ease, stroke .3s ease;
+}
+button, input, textarea, select {
+  font-family: inherit;
 }
 body {
   margin: 0;
@@ -136,7 +136,6 @@ body {
   gap: 10px;
 }
 .brand h1 {
-  font-family: "Quicksand", sans-serif;
   font-weight: 700;
   font-size: 21px;
   letter-spacing: .01em;
@@ -149,7 +148,6 @@ body {
   flex-wrap: wrap;
 }
 .btn {
-  font-family: "Quicksand", sans-serif;
   font-size: 12.5px;
   letter-spacing: .02em;
   font-weight: 600;
@@ -213,7 +211,6 @@ body {
   pointer-events: auto;
 }
 .settings-group-label {
-  font-family: "Quicksand", sans-serif;
   font-weight: 700;
   font-size: 10px;
   letter-spacing: .06em;
@@ -230,7 +227,6 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  font-family: "Quicksand", sans-serif;
   font-weight: 600;
   font-size: 13px;
   color: var(--ink);
@@ -354,7 +350,6 @@ section.block {
   flex-wrap: wrap;
 }
 .block-head h2 {
-  font-family: "Quicksand", sans-serif;
   font-size: 18px;
   font-weight: 700;
   letter-spacing: .01em;
@@ -368,7 +363,6 @@ section.block {
   padding: 7px 8px 7px 18px;
 }
 .section-count {
-  font-family: "Quicksand", sans-serif;
   font-size: 12px;
   font-weight: 700;
   color: var(--accent2);
@@ -414,7 +408,6 @@ section.block {
   flex-wrap: wrap;
 }
 .search {
-  font-family: "Quicksand", sans-serif;
   font-size: 13px;
   font-weight: 500;
   padding: 9px 14px;
@@ -446,7 +439,6 @@ section.block {
   gap: 14px;
 }
 .db-page-info {
-  font-family: "Quicksand", sans-serif;
   font-size: 12.5px;
   font-weight: 600;
   color: var(--ink-dim);
@@ -480,7 +472,6 @@ section.block {
   position: absolute;
   top: 10px;
   right: 12px;
-  font-family: "Quicksand", sans-serif;
   font-size: 10px;
   font-weight: 700;
   color: var(--ink-faint);
@@ -490,7 +481,6 @@ section.block {
   flex-shrink: 0;
 }
 .db-name {
-  font-family: "Quicksand", sans-serif;
   font-size: 17px;
   font-weight: 600;
   flex: 1;
@@ -512,7 +502,6 @@ section.block {
   background: var(--panel-2);
 }
 .chip {
-  font-family: "Quicksand", sans-serif;
   font-weight: 700;
   font-size: 10.5px;
   line-height: 12px;
@@ -550,7 +539,6 @@ body.light .chip:hover {
   text-align: center;
   padding: 34px 16px;
   color: var(--ink-dim);
-  font-family: "Quicksand", sans-serif;
   font-size: 14px;
   font-weight: 600;
   border: 1px dashed var(--line);
@@ -584,7 +572,6 @@ body.light .chip:hover {
   margin-bottom: 10px;
 }
 .mycard-name {
-  font-family: "Quicksand", sans-serif;
   font-size: 19px;
   font-weight: 700;
   flex: 1;
@@ -594,7 +581,6 @@ body.light .chip:hover {
 }
 .focus-line {
   font-size: 12px;
-  font-family: "Quicksand", sans-serif;
   font-weight: 600;
   margin-bottom: 12px;
   color: var(--e-text);
@@ -602,7 +588,6 @@ body.light .chip:hover {
   flex-wrap: wrap;
 }
 .focus-line b {
-  font-family: "Quicksand", sans-serif;
   font-size: 10.5px;
   letter-spacing: .03em;
   font-weight: 700;
@@ -621,7 +606,6 @@ body.light .chip:hover {
   margin-bottom: 8px;
 }
 .trophy-top .label {
-  font-family: "Quicksand", sans-serif;
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: .04em;
@@ -641,7 +625,6 @@ body.light .chip:hover {
   box-shadow: 0 0 8px rgba(var(--accent2-rgb), .6);
 }
 .progress-pct {
-  font-family: "Quicksand", sans-serif;
   font-size: 11px;
   font-weight: 700;
   min-width: 66px;
@@ -690,7 +673,6 @@ body.light .chip:hover {
 }
 .add-trophy input {
   flex: 1;
-  font-family: "Quicksand", sans-serif;
   font-size: 12px;
   font-weight: 500;
   padding: 7px 10px;
@@ -759,7 +741,6 @@ body.light .chip:hover {
   flex-shrink: 0;
 }
 .race-grade-tag {
-  font-family: "Quicksand", sans-serif;
   font-weight: 700;
   font-size: 10px;
   padding: 2px 7px;
@@ -769,7 +750,6 @@ body.light .chip:hover {
   flex-shrink: 0;
 }
 .mini-tag {
-  font-family: "Quicksand", sans-serif;
   font-weight: 700;
   font-size: 9.5px;
   padding: 2px 7px;
@@ -814,7 +794,6 @@ body.light .chip:hover {
   justify-content: center;
   width: 100%;
   height: 100%;
-  font-family: "Quicksand", sans-serif;
   font-weight: 700;
   font-size: calc(var(--icon-size, 32px) * 0.4);
   color: var(--ink-faint);
@@ -843,13 +822,11 @@ body.light .chip:hover {
   transform: translateY(0);
 }
 #tooltip .tt-head {
-  font-family: "Quicksand", sans-serif;
   font-weight: 700;
   font-size: 13px;
   margin-bottom: 3px;
 }
 #tooltip .tt-stat {
-  font-family: "Quicksand", sans-serif;
   font-size: 10px;
   font-weight: 600;
   color: var(--ink-dim);
@@ -866,7 +843,6 @@ footer {
   font-size: 11px;
   color: var(--ink-faint);
   margin-top: 50px;
-  font-family: "Quicksand", sans-serif;
   font-weight: 500;
   line-height: 1.7;
 }
@@ -879,7 +855,6 @@ footer {
   background: none;
   border: none;
   color: var(--ink-dim);
-  font-family: "Quicksand", sans-serif;
   font-weight: 700;
   font-size: 12.5px;
   cursor: pointer;
@@ -970,7 +945,6 @@ footer {
   border-radius: 11px;
 }
 .cal-trainee-name {
-  font-family: "Quicksand", sans-serif;
   font-weight: 700;
   font-size: 18px;
 }
@@ -988,7 +962,6 @@ footer {
   z-index: 60;
 }
 .cal-tool-box-title {
-  font-family: "Quicksand", sans-serif;
   font-weight: 700;
   font-size: 12px;
   letter-spacing: .04em;
@@ -1056,7 +1029,6 @@ footer {
   z-index: 30;
 }
 .cal-tab-btn {
-  font-family: "Quicksand", sans-serif;
   font-weight: 600;
   font-size: 12.5px;
   padding: 7px 14px;
@@ -1083,7 +1055,6 @@ footer {
   gap: 8px;
 }
 .cal-cell-label {
-  font-family: "Quicksand", sans-serif;
   font-weight: 700;
   font-size: 10px;
   letter-spacing: .05em;
@@ -1163,7 +1134,6 @@ footer {
   flex-shrink: 0;
 }
 .cal-grade-tag {
-  font-family: "Quicksand", sans-serif;
   font-weight: 700;
   font-size: 9.5px;
   padding: 1px 7px;
@@ -1294,7 +1264,6 @@ footer {
   margin-bottom: 10px;
 }
 .sort-btn {
-  font-family: "Quicksand", sans-serif;
   font-weight: 600;
   font-size: 11px;
   padding: 4px 10px;
@@ -1310,7 +1279,6 @@ footer {
   border-color: var(--accent);
 }
 .cal-trainee-group-label {
-  font-family: "Quicksand", sans-serif;
   font-weight: 700;
   font-size: 10px;
   letter-spacing: .05em;
@@ -1349,7 +1317,6 @@ footer {
   white-space: nowrap;
 }
 .cal-trainee-current {
-  font-family: "Quicksand", sans-serif;
   font-weight: 700;
   font-size: 9.5px;
   color: var(--accent2);
@@ -1403,7 +1370,6 @@ footer {
   margin-bottom: 12px;
 }
 .modal-title {
-  font-family: "Quicksand", sans-serif;
   font-weight: 700;
   font-size: 16px;
   color: var(--ink);
@@ -1427,7 +1393,6 @@ footer {
 }
 .version-badge {
   display: inline-block;
-  font-family: "Quicksand", sans-serif;
   font-weight: 700;
   font-size: 11px;
   letter-spacing: .04em;
@@ -1530,6 +1495,11 @@ footer {
   .cal-trainee-panel {
     width: 300px;
     max-width: 80vw;
+  }
+  .topbar, .mycard, .cal-trainee-card, .cal-tool-box, .modal-box {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--faux-glass-bg); 
   }
 }
 body.light .btn {

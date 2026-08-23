@@ -534,7 +534,7 @@ export function closeCalTraineePanel() {
   if (calTraineePanelOpen) {
     calTraineePanelOpen = false;
     calTraineePanelRevealed = false;
-    const arrow = document.querySelector('.cal-trainee-arrow');
+    const arrow = document.querySelector('#cal-trainee-btn .cal-trainee-arrow');
     const panel = document.getElementById('cal-trainee-panel');
     if (arrow) arrow.classList.remove('open');
     if (panel) panel.classList.remove('open');
