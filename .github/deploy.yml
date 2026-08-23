@@ -1,0 +1,69 @@
+name: Deploy minified to GitHub Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install minifiers
+        run: npm install --no-save --no-package-lock terser csso
+
+      - name: Build deploy dir
+        run: |
+          set -e
+
+          build_one() {
+            SRC="$1"
+            DEST="$2"
+            mkdir -p "$DEST/data" "$DEST/icons"
+
+            cp "$SRC/index.html" "$DEST/"
+            cp "$SRC/favicon.png" "$DEST/"
+            [ -d "$SRC/icons" ] && cp -R "$SRC/icons/." "$DEST/icons/" || true
+
+            for f in main core standard-view calendar; do
+              npx terser "$SRC/$f.js" --module -c -m -o "$DEST/$f.js"
+            done
+
+            for f in database races; do
+              npx terser "$SRC/data/$f.js" --module -c -m -o "$DEST/data/$f.js"
+            done
+
+            npx csso "$SRC/style.css" -o "$DEST/style.css"
+
+            for f in main core standard-view calendar data/database data/races; do
+              node --input-type=module --check < "$DEST/$f.js"
+            done
+          }
+
+          build_one "." "deploy"
+          build_one "preview" "deploy/preview"
+
+          [ -f CNAME ] && cp CNAME deploy/ || true
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: deploy
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
