@@ -18,12 +18,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
       - name: Install minifiers
         run: npm install --no-save --no-package-lock terser csso
 
       - name: Build deploy dir
         run: |
           set -e
+          TERSER="$(pwd)/node_modules/.bin/terser"
+          CSSO="$(pwd)/node_modules/.bin/csso"
 
           build_one() {
             SRC="$1"
@@ -35,14 +38,14 @@ jobs:
             [ -d "$SRC/icons" ] && cp -R "$SRC/icons/." "$DEST/icons/" || true
 
             for f in main core standard-view calendar; do
-              npx terser "$SRC/$f.js" --module -c -m -o "$DEST/$f.js"
+              "$TERSER" "$SRC/$f.js" --module -c -m -o "$DEST/$f.js"
             done
 
             for f in database races; do
-              npx terser "$SRC/data/$f.js" --module -c -m -o "$DEST/data/$f.js"
+              "$TERSER" "$SRC/data/$f.js" --module -c -m -o "$DEST/data/$f.js"
             done
 
-            npx csso "$SRC/style.css" -o "$DEST/style.css"
+            "$CSSO" "$SRC/style.css" -o "$DEST/style.css"
 
             for f in main core standard-view calendar data/database data/races; do
               node --input-type=module --check < "$DEST/$f.js"
@@ -58,6 +61,7 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: deploy
+
   deploy:
     needs: build
     runs-on: ubuntu-latest
