@@ -20,7 +20,7 @@ jobs:
           node-version: 20
 
       - name: Install minifiers
-        run: npm install --no-save --no-package-lock terser csso
+        run: npm install --no-save --no-package-lock terser csso-cli
 
       - name: Build deploy dir
         run: |
