@@ -23,7 +23,7 @@ export const RACES = [
   {grade:'G1',year:'Junior',month:'December',turn:'Early',name:'Asahi Hai Futurity Stakes',track:'Turf',distance:'Mile'},
   {grade:'G1',year:'Classic, Senior',month:'December',turn:'Late',name:'Arima Kinen',track:'Turf',distance:'Long'},
   {grade:'G1',year:'Junior',month:'December',turn:'Late',name:'Hopeful Stakes',track:'Turf',distance:'Medium'},
-  {grade:'G1',year:'Classic, Senior',month:'December',turn:'Late',name:'Tokyo Daitoshen',track:'Dirt',distance:'Medium'},
+  {grade:'G1',year:'Classic, Senior',month:'December',turn:'Late',name:'Tokyo Daishoten',track:'Dirt',distance:'Medium'},
   {grade:'G1',year:'Classic, Senior',month:'November',turn:'Early',name:'JBC Classic',track:'Dirt',distance:'Medium'},
   {grade:'G1',year:'Classic, Senior',month:'November',turn:'Early',name:'JBC Sprint',track:'Dirt',distance:'Sprint'},
   {grade:'G1',year:'Classic, Senior',month:'November',turn:'Early',name:'JBC Ladies Classic',track:'Dirt',distance:'Mile'},
