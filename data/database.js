@@ -5,8 +5,20 @@ export const DATABASE = [
   { name: "Nice Nature", apt: { turf: "A", dirt: "G", sprint: "G", mile: "C", medium: "A", long: "A" } },
   { name: "Silence Suzuka", apt: { turf: "A", dirt: "G", sprint: "D", mile: "A", medium: "A", long: "E" } },
   { name: "Matikanefukukitaru", apt: { turf: "A", dirt: "F", sprint: "F", mile: "C", medium: "A", long: "A" } },
-  { name: "Daiwa Scarlet", apt: { turf: "A", dirt: "G", sprint: "F", mile: "A", medium: "A", long: "B" } },
-  { name: "Vodka", apt: { turf: "A", dirt: "G", sprint: "F", mile: "A", medium: "A", long: "F" } },
+  {
+    name: "Daiwa Scarlet", apt: {
+      turf: "A", dirt: "G", sprint: "F",
+      mile: { base: "A", alt: "B", note: "A on base costume — her \"Christmas\" costume lowers this to B." },
+      medium: "A",
+      long: { base: "B", alt: "A", note: "B on base costume — her \"Christmas\" costume raises this to A." }
+    }
+  },
+  {
+    name: "Vodka", apt: {
+      turf: "A", dirt: "G", sprint: "F", mile: "A", medium: "A",
+      long: { base: "F", alt: "E", note: "F on base costume — her \"Christmas\" costume raises this to E." }
+    }
+  },
   { name: "Maruzensky", apt: { turf: "A", dirt: "D", sprint: "B", mile: "A", medium: "B", long: "C" } },
   { name: "Agnes Tachyon", apt: { turf: "A", dirt: "G", sprint: "G", mile: "D", medium: "A", long: "B" } },
   { name: "Taiki Shuttle", apt: { turf: "A", dirt: "B", sprint: "A", mile: "A", medium: "E", long: "G" } },
@@ -70,4 +82,7 @@ export const DATABASE = [
   { name: "Yukino Bijin", apt: { turf: "A", dirt: "B", sprint: "D", mile: "A", medium: "A", long: "E" } },
   { name: "Seeking the Pearl", apt: { turf: "A", dirt: "F", sprint: "A", mile: "A", medium: "E", long: "G" } },
   { name: "Aston Machan", apt: { turf: "A", dirt: "G", sprint: "A", mile: "B", medium: "G", long: "G" } },
+  { name: "Yamanin Zephyr", apt: { turf: "A", dirt: "D", sprint: "B", mile: "A", medium: "A", long: "G" } },
+  { name: "Nakayama Festa", apt: { turf: "A", dirt: "G", sprint: "G", mile: "C", medium: "A", long: "B" } },
+  { name: "Wonder Acute", apt: { turf: "G", dirt: "A", sprint: "D", mile: "A", medium: "A", long: "E" } },
 ];
