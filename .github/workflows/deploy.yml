@@ -34,7 +34,8 @@ jobs:
             mkdir -p "$DEST/data" "$DEST/icons"
 
             cp "$SRC/index.html" "$DEST/"
-            cp "$SRC/favicon.png" "$DEST/"
+            # Preview reuses the root favicon via ../favicon.png, so it has no local copy.
+            [ -f "$SRC/favicon.png" ] && cp "$SRC/favicon.png" "$DEST/" || true
             [ -d "$SRC/icons" ] && cp -R "$SRC/icons/." "$DEST/icons/" || true
 
             for f in main core standard-view calendar; do
