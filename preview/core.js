@@ -226,7 +226,9 @@ export function escapeHtml(str) {
 export function gradeOf(v) { return typeof v === 'string' ? v : v.base; }
 export function altOf(v) { return typeof v === 'string' ? null : v; }
 export const tooltipEl = document.getElementById('tooltip');
+let tooltipTarget = null;
 function positionTooltip(target) {
+  if (!target || !tooltipEl) return;
   const rect = target.getBoundingClientRect();
   const tooltipWidth = tooltipEl.getBoundingClientRect().width;
   tooltipEl.style.left = Math.min(rect.left, window.innerWidth - tooltipWidth - 16) + "px";
@@ -254,6 +256,7 @@ export function showTooltip(target, catKey, aptValue) {
   tooltipEl.style.maxWidth = '';
   tooltipEl.style.borderTopColor = `var(--${info.tier})`;
   tooltipEl.innerHTML = html;
+  tooltipTarget = target;
   positionTooltip(target);
 }
 export function showTextTooltip(target, text) {
@@ -261,9 +264,26 @@ export function showTextTooltip(target, text) {
   tooltipEl.style.maxWidth = '200px';
   tooltipEl.style.borderTopColor = '';
   tooltipEl.innerHTML = `<div>${escapeHtml(text)}</div>`;
+  tooltipTarget = target;
   positionTooltip(target);
 }
-export function hideTooltip() { tooltipEl.classList.remove('show'); }
+export function hideTooltip() {
+  tooltipTarget = null;
+  tooltipEl.classList.remove('show');
+}
+
+function repositionTooltip() {
+  if (!tooltipTarget || !tooltipEl.classList.contains('show')) return;
+  if (!tooltipTarget.isConnected) {
+    hideTooltip();
+    return;
+  }
+  positionTooltip(tooltipTarget);
+}
+
+// Scroll events do not bubble from nested scrollers, so capture them at document level.
+document.addEventListener('scroll', repositionTooltip, true);
+window.addEventListener('resize', repositionTooltip);
 export const CHEVRON_SVG = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 export function chipHtml(apt, key) {
   const cat = CATS.find(c => c.key === key);
@@ -356,7 +376,7 @@ export function iconHtml(name, size) {
   const slug = slugify(name);
   const initial = (name.trim()[0] || '?').toUpperCase();
   return `<div class="trainee-icon" style="--icon-size:${size}px">
-  <img src="icons/${slug}.png" alt="" loading="lazy">
+  <img src="../icons/${slug}.png" alt="" loading="lazy">
   <span class="icon-fallback">${initial}</span>
 </div>`;
 }

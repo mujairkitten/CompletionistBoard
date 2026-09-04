@@ -67,27 +67,32 @@ export function renderDatabase() {
 
   wireChips(grid);
   wireDbGridActions(grid);
-  renderPagination('db-pagination-top', 'db-pagination-bottom', dbPage, totalPages, (delta) => {
-    dbPage += delta;
+  renderPagination('db-pagination-top', 'db-pagination-bottom', dbPage, totalPages, (nextPage) => {
+    dbPage = nextPage;
     renderDatabase();
-  }, 'db-grid');
+  });
 }
 
-function renderPagination(topId, bottomId, page, totalPages, onGoToPage, scrollTargetId) {
+function renderPagination(topId, bottomId, page, totalPages, onGoToPage) {
   [topId, bottomId].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     if (totalPages <= 1) { el.innerHTML = ""; return; }
+    const pageButtons = Array.from({ length: totalPages }, (_, index) => {
+      const pageNumber = index + 1;
+      return `<button class="btn small page-number${pageNumber === page ? ' active' : ''}" data-page="${pageNumber}" aria-label="Go to page ${pageNumber}" ${pageNumber === page ? 'aria-current="page"' : ''}>${pageNumber}</button>`;
+    }).join('');
     el.innerHTML = `
-      <button class="btn small" data-page-action="prev" ${page <= 1 ? 'disabled' : ''}>‹ Prev</button>
-      <span class="db-page-info">Page ${page} of ${totalPages}</span>
-      <button class="btn small" data-page-action="next" ${page >= totalPages ? 'disabled' : ''}>Next ›</button>
+      <button class="btn small page-arrow" data-page-action="prev" aria-label="Previous page" title="Previous page" ${page <= 1 ? 'disabled' : ''}>‹</button>
+      <span class="db-page-numbers">${pageButtons}</span>
+      <button class="btn small page-arrow" data-page-action="next" aria-label="Next page" title="Next page" ${page >= totalPages ? 'disabled' : ''}>›</button>
     `;
-    el.querySelectorAll('[data-page-action]').forEach(btn => {
+    el.querySelectorAll('[data-page-action], [data-page]').forEach(btn => {
       btn.addEventListener('click', () => {
-        onGoToPage(btn.dataset.pageAction === 'next' ? 1 : -1);
-        const target = document.getElementById(scrollTargetId);
-        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const nextPage = btn.dataset.page
+          ? Number(btn.dataset.page)
+          : page + (btn.dataset.pageAction === 'next' ? 1 : -1);
+        onGoToPage(nextPage);
       });
     });
   });
@@ -112,7 +117,7 @@ export function renderMyList() {
   if (state.myList.length === 0) {
     emptyEl.style.display = "block";
     wrap.innerHTML = "";
-    renderPagination('my-pagination-top', 'my-pagination-bottom', 1, 1, () => {}, 'mylist');
+    renderPagination('my-pagination-top', 'my-pagination-bottom', 1, 1, () => {});
     return;
   }
   emptyEl.style.display = "none";
@@ -186,10 +191,10 @@ export function renderMyList() {
     if (pageBox) wireCalPage(pageBox, t, renderMyList);
   });
 
-  renderPagination('my-pagination-top', 'my-pagination-bottom', myPage, totalPages, (delta) => {
-    myPage += delta;
+  renderPagination('my-pagination-top', 'my-pagination-bottom', myPage, totalPages, (nextPage) => {
+    myPage = nextPage;
     renderMyList();
-  }, 'mylist');
+  });
 }
 
 export function findRaceByExactName(name) {

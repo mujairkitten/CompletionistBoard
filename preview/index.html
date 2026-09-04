@@ -8,7 +8,7 @@
   <title>Completionist Board</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="icon" type="image/png" href="../favicon.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -153,18 +153,31 @@
 <div id="calendar-view" style="display:none;"></div>
 
 <div class="modal-overlay" id="about-overlay">
-  <div class="modal-box" id="about-modal">
+  <div class="modal-box about-modal" id="about-modal">
     <div class="modal-head">
-      <span class="modal-title">About</span>
+      <span class="modal-title">About the app</span>
       <button class="modal-close" id="about-close" aria-label="Close">✕</button>
     </div>
-    <div class="version-badge">v4.1.1 [Database: v2609a]</div>
+    <div class="version-badge">
+      <div class="version-item"><span>Version</span><strong>v4.3</strong></div>
+      <span class="version-divider" aria-hidden="true">|</span>
+      <div class="version-item"><span>Database</span><strong>v2609a</strong></div>
+    </div>
     <div class="about-text">
-      <p>Character aptitudes consolidated from the Umamusume Wiki trainee tables across all Global costumes.</p>
-      <p>Race calendar sourced from a 152-race G1-G3 dataset. Out-of-Bond holds custom (non-race) trophies, which have no fixed date.</p>
-      <p>Calendar View is an optional toggle. Your list is stored privately in this browser — use Backup to move it between sessions or devices.</p>
-      <p>Want to return to the stable build? Open the <a href="../">Main version (current ver.: 4.1.1)</a>.</p>
-      <p>2026, Mujairkitten. Made with various AI tools. Not affiliated with Cygames. Source code is licensed under GPL-3. Uma icons are subject to Cygames, used fairly according to <a href="https://umamusume.com/fan-createdguide">Cygames' Fan Content Guide.</a></p>
+      <div class="about-section">
+        <div class="about-section-label">Data</div>
+        <p>Character aptitudes are consolidated from the Umamusume Wiki trainee tables across all Global costumes.</p>
+        <p>The race calendar includes 152 G1–G3 races. Out-of-Bond is for custom trophies without a fixed date.</p>
+      </div>
+      <div class="about-section">
+        <div class="about-section-label">Privacy &amp; backup</div>
+        <p>Your list stays private in this browser. Use <strong>Backup</strong> to move it between sessions or devices.</p>
+      </div>
+      <div class="about-section about-links">
+        <div class="about-section-label">More</div>
+        <p>Want to return to the stable build? Open the <a href="../">Main version <span>(current ver.: 4.3)</span></a>.</p>
+        <p class="about-credit">2026, Mujairkitten · Made with various AI tools · Not affiliated with Cygames.<br>Source code is licensed under GPL-3. Uma icons follow <a href="https://umamusume.com/fan-createdguide">Cygames' Fan Content Guide</a>.</p>
+      </div>
     </div>
   </div>
 </div>
