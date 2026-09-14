@@ -1,4 +1,5 @@
 import { RACES } from './data/races.js';
+import { renderMyList, renderDatabase } from './render-bus.js';
 
 export const GRADES = ["A", "B", "C", "D", "E", "F", "G"];
 export const GRADE_INFO = {
@@ -42,6 +43,11 @@ const SAFE_ID = /^[a-z0-9]{7}$/;
 const MAX_NAME_LENGTH = 120;
 const MAX_NOTE_LENGTH = 500;
 const MAX_TROPHIES_PER_TRAINEE = 300;
+const VALID_CAL_MONTHS = new Set([
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+]);
+const VALID_CAL_TURNS = new Set(["Early", "Late"]);
 
 function defaultSettings() {
   return {
@@ -51,7 +57,8 @@ function defaultSettings() {
     lightMode: false,
     colorTheme: 'turf',
     activeTraineeId: null,
-    navbarPosition: 'right'
+    navbarPositionDesktop: 'right',
+    navbarPositionMobile: 'bottom'
   };
 }
 export let state = {
@@ -60,7 +67,12 @@ export let state = {
 };
 let saveQueue = Promise.resolve();
 
-export function uid() { return Math.random().toString(36).slice(2, 9); }
+const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789';
+export function uid() {
+  let id = '';
+  for (let i = 0; i < 7; i++) id += ID_CHARS[Math.floor(Math.random() * ID_CHARS.length)];
+  return id;
+}
 export function debounce(fn, delay = 150) {
   let timer;
   return (...args) => {
@@ -126,12 +138,18 @@ function normalizeTrophy(value, usedIds) {
   }
   return trophy;
 }
+function isValidSlotKey(slotKey) {
+  if (typeof slotKey !== 'string') return false;
+  const parts = slotKey.split('|');
+  if (parts.length !== 2) return false;
+  return VALID_CAL_MONTHS.has(parts[0]) && VALID_CAL_TURNS.has(parts[1]);
+}
 function normalizeCalendarOrder(value) {
   if (!isPlainObject(value)) return {};
   const validRaceNames = new Set(RACES.map(race => race.name));
   const order = {};
   for (const [slotKey, names] of Object.entries(value)) {
-    if (!Array.isArray(names) || !/^[A-Z][a-z]+|(Early|Late)$/.test(slotKey)) continue;
+    if (!Array.isArray(names) || !isValidSlotKey(slotKey)) continue;
     order[slotKey] = names
       .filter(name => typeof name === 'string' && validRaceNames.has(name))
       .slice(0, RACES.length);
@@ -157,16 +175,32 @@ function normalizeTrainee(value, usedTraineeIds) {
     calendarOrder: normalizeCalendarOrder(value.calendarOrder)
   };
 }
-function normalizeSettings(value, trainees) {
+export function normalizeSettings(value, trainees) {
   const raw = isPlainObject(value) ? value : {};
   const settings = defaultSettings();
   for (const key of ['allowCustomTrainees', 'allowCustomTrophies', 'calendarViewMode', 'lightMode']) {
     if (typeof raw[key] === 'boolean') settings[key] = raw[key];
   }
   settings.colorTheme = raw.colorTheme === 'dirt' ? 'dirt' : 'turf';
-  settings.navbarPosition = ['left', 'bottom', 'right', 'top'].includes(raw.navbarPosition)
+
+  // Migration: legacy single-field `navbarPosition` → two-field model.
+  const legacy = ['left', 'bottom', 'right', 'top'].includes(raw.navbarPosition)
     ? raw.navbarPosition
+    : null;
+
+  const desktopRaw = raw.navbarPositionDesktop ?? legacy ?? 'right';
+  settings.navbarPositionDesktop = ['left', 'bottom', 'right', 'top'].includes(desktopRaw)
+    ? desktopRaw
     : 'right';
+
+  const mobileRaw = raw.navbarPositionMobile ?? legacy ?? 'bottom';
+  if (['top', 'bottom'].includes(mobileRaw)) {
+    settings.navbarPositionMobile = mobileRaw;
+  } else {
+    // Legacy 'left'/'right' has no mobile equivalent — the visual default is bottom.
+    settings.navbarPositionMobile = 'bottom';
+  }
+
   if (typeof raw.activeTraineeId === 'string' && trainees.some(t => t.id === raw.activeTraineeId)) {
     settings.activeTraineeId = raw.activeTraineeId;
   }
@@ -190,16 +224,17 @@ function normalizeState(value) {
   return { myList, settings: normalizeSettings(raw.settings, myList) };
 }
 export async function loadState() {
+  let parsed = null;
   try {
     if (window.storage && typeof window.storage.get === 'function') {
       const res = await window.storage.get('mylist', false);
-      if (res && res.value) { state = normalizeState(JSON.parse(res.value)); }
+      if (res && res.value) parsed = JSON.parse(res.value);
     } else {
       const val = localStorage.getItem('mylist');
-      if (val) { state = normalizeState(JSON.parse(val)); }
+      if (val) parsed = JSON.parse(val);
     }
   } catch (e) { console.error("Storage load failed", e); }
-  state = normalizeState(state);
+  state = normalizeState(parsed);
 }
 export function saveState() {
   let snapshot;
@@ -222,28 +257,48 @@ export function saveState() {
   });
   return saveQueue;
 }
+
+/* ---------- Escaping ---------- */
+// escapeHtml is for text nodes / element content (does NOT escape quotes).
+// escapeAttr is for anything interpolated into an HTML attribute value.
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 export function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+  return String(str).replace(/[&<>]/g, ch => HTML_ESCAPES[ch]);
 }
+export function escapeAttr(str) {
+  return String(str).replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
+}
+
 export function gradeOf(v) { return typeof v === 'string' ? v : v.base; }
 export function altOf(v) { return typeof v === 'string' ? null : v; }
-export const tooltipEl = document.getElementById('tooltip');
+
+/* ---------- Tooltip ---------- */
+let tooltipEl = null;
 let tooltipTarget = null;
+function ensureTooltipEl() {
+  if (!tooltipEl) {
+    tooltipEl = document.getElementById('tooltip');
+    if (tooltipEl) tooltipEl.setAttribute('role', 'tooltip');
+  }
+  return tooltipEl;
+}
 function positionTooltip(target) {
-  if (!target || !tooltipEl) return;
+  const el = ensureTooltipEl();
+  if (!target || !el) return;
   const rect = target.getBoundingClientRect();
-  const tooltipWidth = tooltipEl.getBoundingClientRect().width;
-  tooltipEl.style.left = Math.min(rect.left, window.innerWidth - tooltipWidth - 16) + "px";
+  const tooltipWidth = el.getBoundingClientRect().width;
+  el.style.left = Math.min(rect.left, window.innerWidth - tooltipWidth - 16) + "px";
   const gap = 8;
-  const tooltipHeight = tooltipEl.getBoundingClientRect().height;
+  const tooltipHeight = el.getBoundingClientRect().height;
   let top = rect.top - tooltipHeight - gap;
   if (top < gap) top = rect.bottom + gap;
-  tooltipEl.style.top = top + "px";
-  tooltipEl.classList.add('show');
+  el.style.top = top + "px";
+  el.classList.add('show');
+  el.setAttribute('aria-hidden', 'false');
 }
 export function showTooltip(target, catKey, aptValue) {
+  const el = ensureTooltipEl();
+  if (!el) return;
   const cat = CATS.find(c => c.key === catKey);
   const grade = gradeOf(aptValue);
   const alt = altOf(aptValue);
@@ -256,28 +311,34 @@ export function showTooltip(target, catKey, aptValue) {
   if (alt) {
     html += `<div class="tt-variant">${escapeHtml(alt.note)}</div>`;
   }
-  tooltipEl.style.width = '';
-  tooltipEl.style.maxWidth = '';
-  tooltipEl.style.borderTopColor = `var(--${info.tier})`;
-  tooltipEl.innerHTML = html;
+  el.style.width = '';
+  el.style.maxWidth = '';
+  el.style.borderTopColor = `var(--${info.tier})`;
+  el.innerHTML = html;
   tooltipTarget = target;
   positionTooltip(target);
 }
 export function showTextTooltip(target, text) {
-  tooltipEl.style.width = 'auto';
-  tooltipEl.style.maxWidth = '200px';
-  tooltipEl.style.borderTopColor = '';
-  tooltipEl.innerHTML = `<div>${escapeHtml(text)}</div>`;
+  const el = ensureTooltipEl();
+  if (!el) return;
+  el.style.width = 'auto';
+  el.style.maxWidth = '200px';
+  el.style.borderTopColor = '';
+  el.innerHTML = `<div>${escapeHtml(text)}</div>`;
   tooltipTarget = target;
   positionTooltip(target);
 }
 export function hideTooltip() {
   tooltipTarget = null;
-  tooltipEl.classList.remove('show');
+  const el = ensureTooltipEl();
+  if (!el) return;
+  el.classList.remove('show');
+  el.setAttribute('aria-hidden', 'true');
 }
 
 function repositionTooltip() {
-  if (!tooltipTarget || !tooltipEl.classList.contains('show')) return;
+  const el = ensureTooltipEl();
+  if (!tooltipTarget || !el || !el.classList.contains('show')) return;
   if (!tooltipTarget.isConnected) {
     hideTooltip();
     return;
@@ -288,6 +349,7 @@ function repositionTooltip() {
 // Scroll events do not bubble from nested scrollers, so capture them at document level.
 document.addEventListener('scroll', repositionTooltip, true);
 window.addEventListener('resize', repositionTooltip);
+
 export const CHEVRON_SVG = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 export function chipHtml(apt, key) {
   const cat = CATS.find(c => c.key === key);
@@ -297,14 +359,15 @@ export function chipHtml(apt, key) {
   const tier = GRADE_INFO[grade].tier;
   const label = `${cat.label} ${grade}${alt ? '/' + alt.alt : ''}`;
   const borderMix = `color-mix(in srgb, var(--${tier}) 55%, transparent)`;
-  const glowMix = `color-mix(in srgb, var(--${tier}) 80%, transparent)`;
+  const glowMix = `color-mix(in srgb, var(--${tier}) 40%, transparent)`;
   let bg = `color-mix(in srgb, var(--${tier}) 24%, transparent)`;
   if (alt) {
     const altTier = GRADE_INFO[alt.alt].tier;
     bg = `linear-gradient(90deg, color-mix(in srgb, var(--${tier}) 26%, transparent) 50%, color-mix(in srgb, var(--${altTier}) 26%, transparent) 50%)`;
   }
   const style = `--chip-bg:${bg};--chip-border:${borderMix};--chip-glow:${glowMix};`;
-  const safeJson = JSON.stringify(value).replace(/'/g, '&#39;');
+  // N6: escapeAttr round-trips correctly for any string (including literal `&amp;`).
+  const safeJson = escapeAttr(JSON.stringify(value));
   return `<button class="chip" style="${style}" data-cat="${key}" data-json='${safeJson}'>${label}</button>`;
 }
 export function aptGroupsHtml(apt) {
@@ -331,7 +394,7 @@ export function wireChips(root) {
       showTooltip(chip, chip.dataset.cat, JSON.parse(chip.dataset.json));
       return;
     }
-    const iconBtn = e.target.closest('.icon-pill-btn[data-tooltip]');
+    const iconBtn = e.target.closest('[data-tooltip]');
     if (iconBtn && root.contains(iconBtn)) {
       if (iconBtn.contains(e.relatedTarget)) return;
       showTextTooltip(iconBtn, iconBtn.dataset.tooltip);
@@ -344,7 +407,7 @@ export function wireChips(root) {
       hideTooltip();
       return;
     }
-    const iconBtn = e.target.closest('.icon-pill-btn[data-tooltip]');
+    const iconBtn = e.target.closest('[data-tooltip]');
     if (iconBtn && root.contains(iconBtn)) {
       if (iconBtn.contains(e.relatedTarget)) return;
       hideTooltip();
@@ -356,7 +419,7 @@ export function wireChips(root) {
       showTooltip(chip, chip.dataset.cat, JSON.parse(chip.dataset.json));
       return;
     }
-    const iconBtn = e.target.closest('.icon-pill-btn[data-tooltip]');
+    const iconBtn = e.target.closest('[data-tooltip]');
     if (iconBtn && root.contains(iconBtn)) {
       showTextTooltip(iconBtn, iconBtn.dataset.tooltip);
     }
@@ -367,7 +430,7 @@ export function wireChips(root) {
       hideTooltip();
       return;
     }
-    const iconBtn = e.target.closest('.icon-pill-btn[data-tooltip]');
+    const iconBtn = e.target.closest('[data-tooltip]');
     if (iconBtn && root.contains(iconBtn)) {
       hideTooltip();
     }
@@ -402,4 +465,88 @@ export function sortRowsByMode(rows, mode) {
   if (mode === "az") return [...rows].sort((a, b) => a.name.localeCompare(b.name));
   if (mode === "za") return [...rows].sort((a, b) => b.name.localeCompare(a.name));
   return rows;
+}
+
+/* ---------- Shared trainee-name canonicalisation ---------- */
+export function traineeNameKey(name) {
+  return (name || "")
+    .normalize('NFKC')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLocaleLowerCase();
+}
+
+/* ---------- Race helpers ---------- */
+export function findRaceByExactName(name) {
+  const q = (name || "").trim().toLowerCase();
+  return RACES.find(r => r.name.toLowerCase() === q);
+}
+export function raceMeta(race) {
+  return {
+    grade: race.grade, track: race.track, distance: race.distance,
+    year: race.year, turn: race.turn, month: race.month
+  };
+}
+
+/* ---------- State actions (render via bus to avoid cycles) ---------- */
+
+export function addToMyList(name, apt) {
+  const normalizedName = traineeNameKey(name);
+  if (!normalizedName) return;
+  if (state.myList.some(t => traineeNameKey(t.name) === normalizedName)) return;
+  const canonicalName = name.normalize('NFKC').trim().replace(/\s+/g, ' ');
+  state.myList.push({ id: uid(), name: canonicalName, aptitudes: apt, trophies: [] });
+  saveState();
+  renderMyList();
+  renderDatabase();
+}
+
+export function removeFromMyList(id) {
+  state.myList = state.myList.filter(t => t.id !== id);
+  if (state.settings.activeTraineeId === id) {
+    state.settings.activeTraineeId = state.myList.length ? state.myList[0].id : null;
+  }
+  saveState();
+  renderMyList();
+  renderDatabase();
+}
+
+export function addTrophy(tid, name, meta) {
+  name = (name || "").trim();
+  if (!name) return;
+  const t = state.myList.find(x => x.id === tid);
+  if (!t) return;
+  const normalizedName = name.toLowerCase();
+  if (t.trophies.some(tr => tr.name.toLowerCase() === normalizedName)) return;
+  const trophy = { id: uid(), name, checked: false };
+  if (meta) {
+    trophy.grade = meta.grade; trophy.track = meta.track; trophy.distance = meta.distance;
+    trophy.year = meta.year; trophy.turn = meta.turn; trophy.month = meta.month;
+  }
+  t.trophies.push(trophy);
+  saveState(); renderMyList();
+}
+
+export function toggleTrophy(tid, trid) {
+  const t = state.myList.find(x => x.id === tid);
+  if (!t) return;
+  const tr = t.trophies.find(x => x.id === trid);
+  if (!tr) return;
+  tr.checked = !tr.checked;
+  saveState(); renderMyList();
+}
+
+export function removeTrophy(tid, trid) {
+  const t = state.myList.find(x => x.id === tid);
+  if (!t) return;
+  t.trophies = t.trophies.filter(x => x.id !== trid);
+  saveState(); renderMyList();
+}
+
+export function addTrophyFromInput(tid, rawName) {
+  const name = (rawName || "").trim();
+  if (!name) return;
+  const race = findRaceByExactName(name);
+  if (!race && !state.settings.allowCustomTrophies) return;
+  addTrophy(tid, name, race ? raceMeta(race) : null);
 }

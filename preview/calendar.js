@@ -1,15 +1,15 @@
 import { DATABASE } from './data/database.js';
 import { RACES, TRACK_TO_APT_KEY, DIST_TO_APT_KEY } from './data/races.js';
 import {
-  state, saveState, uid, escapeHtml, gradeOf, GRADE_INFO, iconHtml, blankIconHtml,
-  aptGroupsHtml, wireChips, sortRowsByMode, raceDateLabel, debounce
+  state, saveState, uid, escapeHtml, escapeAttr, gradeOf, GRADE_INFO, iconHtml, blankIconHtml,
+  aptGroupsHtml, wireChips, sortRowsByMode, raceDateLabel, debounce,
+  addToMyList, removeFromMyList, toggleTrophy, findRaceByExactName, traineeNameKey
 } from './core.js';
-import { addToMyList, removeFromMyList, toggleTrophy, findRaceByExactName } from './standard-view.js';
 import {
   closeSettingsPanel,
   toggleMode, toggleColorTheme, setAllowCustomTrainees,
   setAllowCustomTrophies, setCalendarViewMode, openBackupModal, openAboutModal
-} from './main.js';
+} from './settings.js';
 
 export const CAL_YEAR_GROUPS = ["Junior", "Classic", "Senior"];
 const CAL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -44,8 +44,7 @@ function isRaceDone(t, raceName) {
   return !!(tr && tr.checked);
 }
 function pendingOrderForSlot(t, slotKey, pendingRaces) {
-  if (!t.calendarOrder) t.calendarOrder = {};
-  const saved = t.calendarOrder[slotKey] || [];
+  const saved = (t.calendarOrder && t.calendarOrder[slotKey]) || [];
   const savedRaces = saved.map(n => pendingRaces.find(r => r.name === n)).filter(Boolean);
   const savedNames = new Set(savedRaces.map(r => r.name));
   const rest = pendingRaces.filter(r => !savedNames.has(r.name));
@@ -85,14 +84,12 @@ let calViewTab = "Junior";
 
 let calTraineePanelOpen = false;
 let calTraineePanelRevealed = false;
+let calTraineePanelJustOpened = false;
 let calTraineeSearch = "";
 let calTraineeSort = "default";
 
-let moreToolsOpen = null;
-let moreToolsRevealed = false;
-function moreToolsDefaultOpen() {
-  return !window.matchMedia('(max-width: 720px)').matches;
-}
+let moreToolsOpen = !window.matchMedia('(max-width: 720px)').matches;
+let moreToolsRevealed = moreToolsOpen;
 
 const CAL_EMPTY_TRAINEE = {
   id: "__empty__",
@@ -115,10 +112,10 @@ function calRaceRowHtml(r, opts) {
   const checked = !!opts.checked;
   const showAdd = !!opts.showAdd;
   return `
-    <div class="cal-race-row${checked ? ' done' : ''}" ${draggable ? 'draggable="true"' : ''} data-race="${escapeHtml(r.name)}">
-      ${draggable ? '<span class="drag-handle" title="Drag to reorder">⠿</span>' : ''}
-      ${showAdd && draggable ? `<button class="cal-race-add-btn" data-race="${escapeHtml(r.name)}" title="Add to race list (unchecked)" aria-label="Add ${escapeHtml(r.name)} to race list, unchecked">+</button>` : ''}
-      <input type="checkbox" class="cal-tick" data-race="${escapeHtml(r.name)}" ${checked ? 'checked' : ''}>
+    <div class="cal-race-row${checked ? ' done' : ''}" ${draggable ? 'draggable="true"' : ''} data-race="${escapeAttr(r.name)}">
+      ${draggable ? '<span class="drag-handle" title="Drag to reorder" aria-hidden="true">⠿</span>' : ''}
+      ${showAdd && draggable ? `<button class="cal-race-add-btn" data-race="${escapeAttr(r.name)}" title="Add to race list (unchecked)" aria-label="Add ${escapeAttr(r.name)} to race list, unchecked">+</button>` : ''}
+      <input type="checkbox" class="cal-tick" data-race="${escapeAttr(r.name)}" aria-label="${escapeAttr(r.name)}" ${checked ? 'checked' : ''}>
       <span class="cal-grade-tag" style="background:${calGradeColor(r.grade)}">${r.grade}</span>
       <span class="cal-race-info">
         <span class="cal-race-name">${escapeHtml(r.name)}</span>
@@ -138,7 +135,11 @@ function calCellHtml(t, yearGroup, month, turn, opts) {
     return `<div class="cal-cell cal-cell-empty" data-slot="${slotKey}" data-year="${yearGroup}">${label}</div>`;
   }
 
-  const pendingHtml = pending.map(r => calRaceRowHtml(r, { draggable: true, checked: false, showAdd: opts.showAdd })).join("");
+  const pendingHtml = pending.map(r => calRaceRowHtml(r, {
+    draggable: true,
+    checked: false,
+    showAdd: opts.showAdd && !trophyForRace(t, r.name)
+  })).join("");
 
   const doneHtml = done.length ? `<div class="cal-done-divider">${done.map(r => calRaceRowHtml(r, { draggable: false, checked: true })).join("")}</div>` : "";
 
@@ -159,7 +160,7 @@ function calOobHtml(t) {
   }
   return `<div class="cal-oob-list">${oob.map(tr => `
     <div class="trophy-item ${tr.checked ? 'checked' : ''}">
-      <input type="checkbox" class="cal-oob-tick" data-tid="${tr.id}" ${tr.checked ? 'checked' : ''}>
+      <input type="checkbox" class="cal-oob-tick" data-tid="${tr.id}" aria-label="${escapeAttr(tr.name)}" ${tr.checked ? 'checked' : ''}>
       <span>${escapeHtml(tr.name)}</span>
     </div>`).join("")}</div>`;
 }
@@ -187,6 +188,7 @@ export function wireCalPage(root, t, onChange) {
 
   root.querySelectorAll('.cal-race-row[draggable="true"]').forEach(row => {
     row.addEventListener('dragstart', (e) => {
+      if (e.target.closest('input, button')) { e.preventDefault(); return; }
       const cell = row.closest('.cal-cell');
       dragCtx = { slotKey: cell.dataset.slot, raceName: row.dataset.race };
       e.dataTransfer.effectAllowed = 'move';
@@ -203,7 +205,10 @@ export function wireCalPage(root, t, onChange) {
       e.preventDefault();
       row.classList.add('drag-over');
     });
-    row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+    row.addEventListener('dragleave', (e) => {
+      if (e.relatedTarget && row.contains(e.relatedTarget)) return;
+      row.classList.remove('drag-over');
+    });
     row.addEventListener('drop', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -241,47 +246,53 @@ export function wireCalPage(root, t, onChange) {
   });
 }
 
-function calTraineePanelHtml(activeTrainee) {
+/* ---------- Trainee picker panel ---------- */
+
+function calTraineeListsHtml(activeTrainee) {
   const q = calTraineeSearch.trim().toLowerCase();
   const mineRows = sortTraineeRows(state.myList.filter(t => t.name.toLowerCase().includes(q)));
-  const myNames = new Set(state.myList.map(t => t.name.toLowerCase()));
-  const otherRows = sortTraineeRows(DATABASE.filter(d => !myNames.has(d.name.toLowerCase()) && d.name.toLowerCase().includes(q)));
+  // N2: use the same canonical key as addToMyList so DB names that normalise
+  // to an existing entry are excluded from "All trainees".
+  const myKeys = new Set(state.myList.map(t => traineeNameKey(t.name)));
+  const otherRows = sortTraineeRows(DATABASE.filter(d => !myKeys.has(traineeNameKey(d.name)) && d.name.toLowerCase().includes(q)));
 
   const mineHtml = mineRows.map(t => `
     <div class="cal-trainee-row ${t.id === activeTrainee.id ? 'active' : ''}" data-switch="${t.id}">
       ${iconHtml(t.name, 28)}
       <span class="cal-trainee-row-name">${escapeHtml(t.name)}</span>
       ${t.id === activeTrainee.id ? '<span class="cal-trainee-current">Current</span>' : ''}
-      <button class="cal-trainee-remove" data-remove="${t.id}" title="Remove from My List" aria-label="Remove ${escapeHtml(t.name)} from My List">&times;</button>
+      <button class="cal-trainee-remove" data-remove="${t.id}" title="Remove from My List" aria-label="Remove ${escapeAttr(t.name)} from My List">&times;</button>
     </div>`).join("") || `<div class="cal-trainee-empty">No matches in My List.</div>`;
 
   const otherHtml = otherRows.map(d => `
-    <div class="cal-trainee-row" data-name="${escapeHtml(d.name)}">
+    <div class="cal-trainee-row" data-name="${escapeAttr(d.name)}">
       ${iconHtml(d.name, 28)}
       <span class="cal-trainee-row-name">${escapeHtml(d.name)}</span>
-      <button class="btn small" data-addswitch="${escapeHtml(d.name)}">+ Add to my list</button>
+      <button class="btn small" data-addswitch="${escapeAttr(d.name)}">+ Add to my list</button>
     </div>`).join("") || `<div class="cal-trainee-empty">No matches.</div>`;
 
   return `
-  <div class="cal-trainee-panel" id="cal-trainee-panel">
-    <input type="text" class="search" id="cal-trainee-search" placeholder="Search trainees…" value="${escapeHtml(calTraineeSearch)}">
+    <div class="cal-trainee-group-label">In My List</div>
+    <div class="cal-trainee-list">${mineHtml}</div>
+    <div class="cal-trainee-group-label">All trainees</div>
+    <div class="cal-trainee-list">${otherHtml}</div>`;
+}
+
+function calTraineePanelHtml(activeTrainee) {
+  // N9: this is a popover, not a modal — use `region` for the label to be valid.
+  return `
+  <div class="cal-trainee-panel" id="cal-trainee-panel" role="region" aria-label="Choose trainee">
+    <input type="text" class="search" id="cal-trainee-search" placeholder="Search trainees…" value="${escapeAttr(calTraineeSearch)}" autocomplete="off">
     <div class="cal-trainee-sort">
       <button class="sort-btn ${calTraineeSort === 'default' ? 'active' : ''}" data-sort="default">Default</button>
       <button class="sort-btn ${calTraineeSort === 'az' ? 'active' : ''}" data-sort="az">A-Z</button>
       <button class="sort-btn ${calTraineeSort === 'za' ? 'active' : ''}" data-sort="za">Z-A</button>
     </div>
-    <div class="cal-trainee-group-label">In My List</div>
-    <div class="cal-trainee-list">${mineHtml}</div>
-    <div class="cal-trainee-group-label">All trainees</div>
-    <div class="cal-trainee-list">${otherHtml}</div>
+    <div id="cal-trainee-lists">${calTraineeListsHtml(activeTrainee)}</div>
   </div>`;
 }
 
 function calSidebarHtml(activeTrainee, isEmpty) {
-  if (moreToolsOpen === null) {
-    moreToolsOpen = moreToolsDefaultOpen();
-    moreToolsRevealed = moreToolsOpen;
-  }
   const iconBlock = isEmpty ? blankIconHtml(72) : iconHtml(activeTrainee.name, 72);
   return `
   <div class="cal-sidebar${calTraineePanelOpen ? ' panel-open' : ''}">
@@ -289,7 +300,7 @@ function calSidebarHtml(activeTrainee, isEmpty) {
       <div class="cal-trainee-card-icon">${iconBlock}</div>
       <div class="cal-trainee-card-right">
         <div class="cal-trainee-card-name-row">
-          <button class="cal-trainee-name-btn" id="cal-trainee-btn">
+          <button class="cal-trainee-name-btn" id="cal-trainee-btn" aria-haspopup="true" aria-expanded="${calTraineePanelOpen ? 'true' : 'false'}">
             <span class="cal-trainee-name">${escapeHtml(activeTrainee.name)}</span>
             <span class="cal-trainee-arrow">
               <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -305,12 +316,12 @@ function calSidebarHtml(activeTrainee, isEmpty) {
     <div class="cal-tool-box">
       <div class="cal-tool-box-title">Find a race</div>
       <div class="cal-locate-wrap">
-        <input type="text" class="search" id="cal-locate-input" placeholder="Search races…" autocomplete="off">
-        <div class="race-suggest" id="cal-locate-suggest"></div>
+        <input type="text" class="search" id="cal-locate-input" placeholder="Search races…" autocomplete="off" aria-label="Search races">
+        <div class="race-suggest" id="cal-locate-suggest" role="listbox"></div>
       </div>
     </div>
     <div class="cal-tool-box">
-      <button class="cal-tool-box-toggle" id="cal-tools-toggle">
+      <button class="cal-tool-box-toggle" id="cal-tools-toggle" aria-expanded="${moreToolsRevealed ? 'true' : 'false'}" aria-controls="cal-tools-body">
         <span class="cal-tool-box-title">More tools</span>
         <span class="cal-trainee-arrow${moreToolsRevealed ? ' open' : ''}">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -393,7 +404,7 @@ function wireCalLocate(host, t) {
         const trackTier = GRADE_INFO[trackGrade].tier;
         const distTier = GRADE_INFO[distGrade].tier;
         return `
-        <div class="race-suggest-item" data-race="${escapeHtml(r.name)}">
+        <div class="race-suggest-item" data-race="${escapeAttr(r.name)}">
           <span class="race-grade-tag" style="background:${calGradeColor(r.grade)}">${r.grade}</span>
           <span class="race-info">
             <span class="race-name">${escapeHtml(r.name)}</span>
@@ -408,7 +419,8 @@ function wireCalLocate(host, t) {
     setOpen(true);
   };
 
-  input.addEventListener('input', showResults);
+  const debouncedShow = debounce(showResults, 120);
+  input.addEventListener('input', debouncedShow);
   input.addEventListener('focus', showResults);
   input.addEventListener('blur', () => setTimeout(() => setOpen(false), 150));
   box.addEventListener('mousedown', (e) => {
@@ -450,20 +462,25 @@ function wireCalTraineePanel(host, activeTrainee) {
     if (calTraineePanelOpen) {
       calTraineePanelOpen = false;
       calTraineePanelRevealed = false;
+      calTraineePanelJustOpened = false;
       const arrow = btn.querySelector('.cal-trainee-arrow');
       const panel = document.getElementById('cal-trainee-panel');
       if (arrow) arrow.classList.remove('open');
       if (panel) panel.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
       setTimeout(renderCalendarView, 250);
     } else {
       calTraineePanelOpen = true;
+      calTraineePanelJustOpened = true;
       renderCalendarView();
       const freshPanel = document.getElementById('cal-trainee-panel');
       const freshArrow = document.querySelector('#cal-trainee-btn .cal-trainee-arrow');
+      const freshBtn = document.getElementById('cal-trainee-btn');
       if (freshPanel) freshPanel.getBoundingClientRect();
       requestAnimationFrame(() => {
         if (freshArrow) freshArrow.classList.add('open');
         if (freshPanel) freshPanel.classList.add('open');
+        if (freshBtn) freshBtn.setAttribute('aria-expanded', 'true');
         calTraineePanelRevealed = true;
       });
     }
@@ -482,51 +499,65 @@ function wireCalTraineePanel(host, activeTrainee) {
 
   const searchInput = document.getElementById('cal-trainee-search');
   if (searchInput) {
-    searchInput.focus();
-    searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+    if (calTraineePanelJustOpened) {
+      calTraineePanelJustOpened = false;
+      searchInput.focus();
+      const len = searchInput.value.length;
+      searchInput.setSelectionRange(len, len);
+    }
     searchInput.addEventListener('input', debounce(() => {
       calTraineeSearch = searchInput.value;
-      renderCalendarView();
+      const listHost = document.getElementById('cal-trainee-lists');
+      if (listHost) listHost.innerHTML = calTraineeListsHtml(activeTrainee);
     }, 150));
   }
 
-  panel.querySelectorAll('.sort-btn').forEach(b => {
-    b.addEventListener('click', () => {
-      calTraineeSort = b.dataset.sort;
-      renderCalendarView();
-    });
-  });
+  panel.addEventListener('click', (e) => {
+    const sortBtn = e.target.closest('.sort-btn');
+    if (sortBtn) {
+      calTraineeSort = sortBtn.dataset.sort;
+      panel.querySelectorAll('.sort-btn').forEach(b => b.classList.toggle('active', b.dataset.sort === calTraineeSort));
+      const listHost = document.getElementById('cal-trainee-lists');
+      if (listHost) listHost.innerHTML = calTraineeListsHtml(activeTrainee);
+      return;
+    }
 
-  panel.querySelectorAll('[data-switch]').forEach(row => {
-    row.addEventListener('click', () => {
-      state.settings.activeTraineeId = row.dataset.switch;
-      calTraineePanelOpen = false;
-      calTraineePanelRevealed = false;
-      saveState();
-      renderCalendarView();
-    });
-  });
-
-  panel.querySelectorAll('[data-addswitch]').forEach(b => {
-    b.addEventListener('click', () => {
-      const d = DATABASE.find(x => x.name === b.dataset.addswitch);
-      if (!d) return;
-      addToMyList(d.name, JSON.parse(JSON.stringify(d.apt)));
-      const added = state.myList[state.myList.length - 1];
-      state.settings.activeTraineeId = added.id;
-      calTraineePanelOpen = false;
-      calTraineePanelRevealed = false;
-      saveState();
-      renderCalendarView();
-    });
-  });
-
-  panel.querySelectorAll('[data-remove]').forEach(b => {
-    b.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('[data-remove]');
+    if (removeBtn) {
       e.stopPropagation();
-      removeFromMyList(b.dataset.remove);
+      removeFromMyList(removeBtn.dataset.remove);
       renderCalendarView();
-    });
+      return;
+    }
+
+    const addBtn = e.target.closest('[data-addswitch]');
+    if (addBtn) {
+      e.stopPropagation();
+      const d = DATABASE.find(x => x.name === addBtn.dataset.addswitch);
+      if (!d) return;
+      // N2: resolve the trainee by canonical key so a name that normalises
+      // to an existing entry doesn't select the wrong card.
+      const wantedKey = traineeNameKey(d.name);
+      addToMyList(d.name, JSON.parse(JSON.stringify(d.apt)));
+      const added = state.myList.find(t => traineeNameKey(t.name) === wantedKey);
+      if (added) state.settings.activeTraineeId = added.id;
+      calTraineePanelOpen = false;
+      calTraineePanelRevealed = false;
+      calTraineePanelJustOpened = false;
+      saveState();
+      renderCalendarView();
+      return;
+    }
+
+    const switchRow = e.target.closest('[data-switch]');
+    if (switchRow) {
+      state.settings.activeTraineeId = switchRow.dataset.switch;
+      calTraineePanelOpen = false;
+      calTraineePanelRevealed = false;
+      calTraineePanelJustOpened = false;
+      saveState();
+      renderCalendarView();
+    }
   });
 }
 
@@ -534,10 +565,13 @@ export function closeCalTraineePanel() {
   if (calTraineePanelOpen) {
     calTraineePanelOpen = false;
     calTraineePanelRevealed = false;
+    calTraineePanelJustOpened = false;
     const arrow = document.querySelector('#cal-trainee-btn .cal-trainee-arrow');
     const panel = document.getElementById('cal-trainee-panel');
+    const btn = document.getElementById('cal-trainee-btn');
     if (arrow) arrow.classList.remove('open');
     if (panel) panel.classList.remove('open');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
     setTimeout(renderCalendarView, 250);
   }
 }
@@ -553,9 +587,9 @@ export function renderCalendarView() {
   } else {
     activeTrainee = state.myList.find(t => t.id === state.settings.activeTraineeId);
     if (!activeTrainee) {
+      // N3: fall back without persisting — render stays pure.
+      // Storage-level healing happens in removeFromMyList / importListFromText.
       activeTrainee = state.myList[0];
-      state.settings.activeTraineeId = activeTrainee.id;
-      saveState();
     }
   }
 
@@ -566,10 +600,10 @@ export function renderCalendarView() {
     <div class="calendar-layout">
       ${calSidebarHtml(activeTrainee, isEmpty)}
       <div class="cal-main${isEmpty ? ' cal-disabled' : ''}">
-        <div class="cal-tabs cal-tabs-main" id="cal-main-tabs">
-          ${mainTabs.map(tab => `<button class="cal-tab-btn ${calViewTab === tab ? 'active' : ''}" data-tab="${tab}">${tab === "OoB" ? "Out-of-Bond" : tab}</button>`).join("")}
+        <div class="cal-tabs cal-tabs-main" id="cal-main-tabs" role="tablist" aria-label="Year group">
+          ${mainTabs.map(tab => `<button class="cal-tab-btn ${calViewTab === tab ? 'active' : ''}" data-tab="${tab}" role="tab" aria-selected="${calViewTab === tab ? 'true' : 'false'}">${tab === "OoB" ? "Out-of-Bond" : tab}</button>`).join("")}
         </div>
-        <div class="cal-page" id="cal-main-page">${calPageHtml(activeTrainee, calViewTab)}</div>
+        <div class="cal-page" id="cal-main-page" role="tabpanel">${calPageHtml(activeTrainee, calViewTab)}</div>
       </div>
     </div>`;
 
@@ -595,17 +629,20 @@ export function renderCalendarView() {
       moreToolsRevealed = false;
       if (list) list.classList.remove('open');
       if (arrow) arrow.classList.remove('open');
+      toolsToggle.setAttribute('aria-expanded', 'false');
       setTimeout(renderCalendarView, 300);
     } else {
       moreToolsOpen = true;
       renderCalendarView();
       const freshList = document.getElementById('cal-tools-body');
       const freshArrow = document.querySelector('#cal-tools-toggle .cal-trainee-arrow');
+      const freshToggle = document.getElementById('cal-tools-toggle');
       if (freshList) freshList.getBoundingClientRect();
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (freshList) freshList.classList.add('open');
           if (freshArrow) freshArrow.classList.add('open');
+          if (freshToggle) freshToggle.setAttribute('aria-expanded', 'true');
           moreToolsRevealed = true;
         });
       });
@@ -615,11 +652,13 @@ export function renderCalendarView() {
   const calBackupBtn = document.getElementById('cal-backup-btn');
   if (calBackupBtn) calBackupBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    closeCalTraineePanel();
     openBackupModal();
   });
   const calAboutBtn = document.getElementById('cal-about-btn');
   if (calAboutBtn) calAboutBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    closeCalTraineePanel();
     openAboutModal();
   });
   const calModeToggleBtn = document.getElementById('cal-mode-toggle-btn');

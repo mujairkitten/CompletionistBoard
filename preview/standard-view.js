@@ -1,33 +1,26 @@
 import { DATABASE } from './data/database.js';
 import { RACES, TRACK_TO_APT_KEY, DIST_TO_APT_KEY } from './data/races.js';
 import {
-  state, saveState, uid, escapeHtml, gradeOf, GRADE_INFO, normalizeImportedTrainees,
-  aptGroupsHtml, wireChips, iconHtml, weakAptitudes, sortRowsByMode, raceDateLabel, debounce
+  state, escapeHtml, escapeAttr, gradeOf, GRADE_INFO,
+  aptGroupsHtml, wireChips, iconHtml, weakAptitudes, sortRowsByMode, raceDateLabel, debounce,
+  traineeNameKey, findRaceByExactName, raceMeta,
+  addToMyList, removeFromMyList, addTrophy, removeTrophy, toggleTrophy, addTrophyFromInput
 } from './core.js';
 import { calPageHtml, wireCalPage, calGradeColor, CAL_YEAR_GROUPS } from './calendar.js';
-import { renderMainView } from './main.js';
 
-export let dbSort = "default";
-export const DB_PAGE_SIZE = 30;
+let dbSort = "default";
+const DB_PAGE_SIZE = 30;
 let dbPage = 1;
-export const MY_PAGE_SIZE = 5;
+const MY_PAGE_SIZE = 5;
 let myPage = 1;
 
 const openInlineCals = new Set();
 const inlineCalTab = {};
 
-function traineeNameKey(name) {
-  return (name || "")
-    .normalize('NFKC')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .toLocaleLowerCase();
-}
-
-let dbGridActionsWired = false;
+const dbGridWired = new WeakSet();
 function wireDbGridActions(grid) {
-  if (dbGridActionsWired) return;
-  dbGridActionsWired = true;
+  if (dbGridWired.has(grid)) return;
+  dbGridWired.add(grid);
   grid.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-add]');
     if (!btn || btn.disabled) return;
@@ -38,6 +31,7 @@ function wireDbGridActions(grid) {
 
 export function renderDatabase() {
   const grid = document.getElementById('db-grid');
+  if (!grid) return;
   const filter = document.getElementById('db-search').value.trim().toLowerCase();
   const list = sortRowsByMode(DATABASE.filter(d => d.name.toLowerCase().includes(filter)), dbSort);
   document.getElementById('db-count').textContent = `${list.length}/${DATABASE.length}`;
@@ -47,12 +41,12 @@ export function renderDatabase() {
   if (dbPage < 1) dbPage = 1;
   const pageList = list.slice((dbPage - 1) * DB_PAGE_SIZE, dbPage * DB_PAGE_SIZE);
 
-  const addedNames = new Set(state.myList.map(t => t.name.toLowerCase()));
+  const addedNames = new Set(state.myList.map(t => traineeNameKey(t.name)));
   const indexByName = new Map(DATABASE.map((d, i) => [d.name, i]));
 
   grid.innerHTML = pageList.map((d) => {
     const realIndex = indexByName.get(d.name);
-    const already = addedNames.has(d.name.toLowerCase());
+    const already = addedNames.has(traineeNameKey(d.name));
     return `
     <div class="db-card">
       ${filter ? '' : `<span class="db-num">${String(realIndex + 1).padStart(2, '0')}</span>`}
@@ -73,14 +67,28 @@ export function renderDatabase() {
   });
 }
 
+function pageWindow(current, total) {
+  const pages = new Set([1, total, current, current - 1, current + 1, current - 2, current + 2]);
+  const list = [...pages].filter(p => p >= 1 && p <= total).sort((a, b) => a - b);
+  const out = [];
+  let prev = 0;
+  for (const p of list) {
+    if (prev && p - prev > 1) out.push('…');
+    out.push(p);
+    prev = p;
+  }
+  return out;
+}
+
 function renderPagination(topId, bottomId, page, totalPages, onGoToPage) {
   [topId, bottomId].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     if (totalPages <= 1) { el.innerHTML = ""; return; }
-    const pageButtons = Array.from({ length: totalPages }, (_, index) => {
-      const pageNumber = index + 1;
-      return `<button class="btn small page-number${pageNumber === page ? ' active' : ''}" data-page="${pageNumber}" aria-label="Go to page ${pageNumber}" ${pageNumber === page ? 'aria-current="page"' : ''}>${pageNumber}</button>`;
+    const pageButtons = pageWindow(page, totalPages).map(item => {
+      if (item === '…') return `<span class="db-page-ellipsis" aria-hidden="true">…</span>`;
+      const isCurrent = item === page;
+      return `<button class="btn small page-number${isCurrent ? ' active' : ''}" data-page="${item}" aria-label="Go to page ${item}" ${isCurrent ? 'aria-current="page"' : ''}>${item}</button>`;
     }).join('');
     el.innerHTML = `
       <button class="btn small page-arrow" data-page-action="prev" aria-label="Previous page" title="Previous page" ${page <= 1 ? 'disabled' : ''}>‹</button>
@@ -98,21 +106,15 @@ function renderPagination(topId, bottomId, page, totalPages, onGoToPage) {
   });
 }
 
-export function addToMyList(name, apt) {
-  const normalizedName = traineeNameKey(name);
-  if (!normalizedName) return;
-  if (state.myList.some(t => traineeNameKey(t.name) === normalizedName)) return;
-  const canonicalName = name.normalize('NFKC').trim().replace(/\s+/g, ' ');
-  state.myList.push({ id: uid(), name: canonicalName, aptitudes: apt, trophies: [] });
-  saveState();
-  renderMyList();
-  renderDatabase();
-}
-
 export function renderMyList() {
   const wrap = document.getElementById('mylist');
+  if (!wrap) return;
   const emptyEl = document.getElementById('mylist-empty');
   document.getElementById('my-count').textContent = `${state.myList.length}/${DATABASE.length}`;
+
+  const liveIds = new Set(state.myList.map(t => t.id));
+  for (const id of [...openInlineCals]) if (!liveIds.has(id)) openInlineCals.delete(id);
+  for (const id of Object.keys(inlineCalTab)) if (!liveIds.has(id)) delete inlineCalTab[id];
 
   if (state.myList.length === 0) {
     emptyEl.style.display = "block";
@@ -179,6 +181,7 @@ export function renderMyList() {
       const calChev = calBtn.querySelector('.cal-trainee-arrow');
       if (calBody) calBody.classList.toggle('open', willOpen);
       if (calChev) calChev.classList.toggle('open', willOpen);
+      calBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
     });
     const tabsBox = document.getElementById(`caltabs-${t.id}`);
     if (tabsBox) tabsBox.querySelectorAll('.cal-tab-btn').forEach(btn => {
@@ -195,15 +198,6 @@ export function renderMyList() {
     myPage = nextPage;
     renderMyList();
   });
-}
-
-export function findRaceByExactName(name) {
-  const q = (name || "").trim().toLowerCase();
-  return RACES.find(r => r.name.toLowerCase() === q);
-}
-
-export function raceMeta(race) {
-  return { grade: race.grade, track: race.track, distance: race.distance, year: race.year, turn: race.turn, month: race.month };
 }
 
 function hideSuggestBox(box) {
@@ -232,7 +226,7 @@ function renderRaceSuggestions(trainee, query, box, inputEl) {
       const trackTier = GRADE_INFO[trackGrade].tier;
       const distTier = GRADE_INFO[distGrade].tier;
       return `
-      <div class="race-suggest-item" data-race="${escapeHtml(r.name)}">
+      <div class="race-suggest-item" data-race="${escapeAttr(r.name)}">
         <span class="race-grade-tag" style="background:${calGradeColor(r.grade)}">${r.grade}</span>
         <span class="race-info">
           <span class="race-name">${escapeHtml(r.name)}</span>
@@ -260,14 +254,6 @@ function renderRaceSuggestions(trainee, query, box, inputEl) {
       }
     });
   });
-}
-
-export function addTrophyFromInput(tid, rawName) {
-  const name = (rawName || "").trim();
-  if (!name) return;
-  const race = findRaceByExactName(name);
-  if (!race && !state.settings.allowCustomTrophies) return;
-  addTrophy(tid, name, race ? raceMeta(race) : null);
 }
 
 function myCardHtml(t) {
@@ -298,10 +284,10 @@ function myCardHtml(t) {
       }
       return `
       <div class="trophy-item ${tr.checked ? 'checked' : ''}">
-        <input type="checkbox" id="cb-${t.id}-${tr.id}" ${tr.checked ? 'checked' : ''}>
+        <input type="checkbox" id="cb-${t.id}-${tr.id}" aria-label="${escapeAttr(tr.name)}" ${tr.checked ? 'checked' : ''}>
         <span>${escapeHtml(tr.name)}</span>
         ${metaHtml}
-        <button class="rm" id="rm-${t.id}-${tr.id}">&times;</button>
+        <button class="rm" id="rm-${t.id}-${tr.id}" aria-label="Remove ${escapeAttr(tr.name)}">&times;</button>
       </div>`;
     }).join("")
     : `<div style="font-size:12px;color:var(--ink-faint);font-style:italic;">No races logged yet.</div>`;
@@ -313,7 +299,7 @@ function myCardHtml(t) {
 
   const inlineCalHtml = `
     <div class="inline-cal">
-      <button class="inline-cal-toggle" id="calbtn-${t.id}">
+      <button class="inline-cal-toggle" id="calbtn-${t.id}" aria-expanded="${openInlineCals.has(t.id) ? 'true' : 'false'}" aria-controls="calbody-${t.id}">
         📅 Calendar
         <span class="cal-trainee-arrow${openInlineCals.has(t.id) ? ' open' : ''}">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -322,10 +308,10 @@ function myCardHtml(t) {
         </span>
       </button>
       <div class="inline-cal-body ${openInlineCals.has(t.id) ? 'open' : ''}" id="calbody-${t.id}">
-        <div class="cal-tabs" id="caltabs-${t.id}">
-          ${inlineTabs.map(tab => `<button class="cal-tab-btn ${inlineActiveTab === tab ? 'active' : ''}" data-tab="${tab}">${tab === "OoB" ? "Out-of-Bond" : tab}</button>`).join("")}
+        <div class="cal-tabs" id="caltabs-${t.id}" role="tablist" aria-label="Year group">
+          ${inlineTabs.map(tab => `<button class="cal-tab-btn ${inlineActiveTab === tab ? 'active' : ''}" data-tab="${tab}" role="tab" aria-selected="${inlineActiveTab === tab ? 'true' : 'false'}">${tab === "OoB" ? "Out-of-Bond" : tab}</button>`).join("")}
         </div>
-        <div class="cal-page" id="calpage-${t.id}">${calPageHtml(t, inlineActiveTab, { showAdd: true })}</div>
+        <div class="cal-page" id="calpage-${t.id}" role="tabpanel">${calPageHtml(t, inlineActiveTab, { showAdd: true })}</div>
       </div>
     </div>`;
 
@@ -346,7 +332,7 @@ function myCardHtml(t) {
       </div>
       <div class="trophy-list">${trophyHtml}</div>
       <div class="add-trophy">
-        <input type="text" id="addt-input-${t.id}" placeholder="Search races…" autocomplete="off">
+        <input type="text" id="addt-input-${t.id}" placeholder="Search races…" autocomplete="off" aria-label="Search races to add">
         <button class="btn small" id="addt-btn-${t.id}">+ Add</button>
         <div class="race-suggest" id="addt-suggest-${t.id}"></div>
       </div>
@@ -355,39 +341,6 @@ function myCardHtml(t) {
   </div>`;
 }
 
-export function removeFromMyList(id) {
-  state.myList = state.myList.filter(t => t.id !== id);
-  saveState(); renderMyList(); renderDatabase();
-}
-export function addTrophy(tid, name, meta) {
-  name = (name || "").trim();
-  if (!name) return;
-  const t = state.myList.find(x => x.id === tid);
-  if (!t) return;
-  const normalizedName = name.toLowerCase();
-  if (t.trophies.some(tr => tr.name.toLowerCase() === normalizedName)) return;
-  const trophy = { id: uid(), name, checked: false };
-  if (meta) {
-    trophy.grade = meta.grade; trophy.track = meta.track; trophy.distance = meta.distance;
-    trophy.year = meta.year; trophy.turn = meta.turn; trophy.month = meta.month;
-  }
-  t.trophies.push(trophy);
-  saveState(); renderMyList();
-}
-export function toggleTrophy(tid, trid) {
-  const t = state.myList.find(x => x.id === tid);
-  if (!t) return;
-  const tr = t.trophies.find(x => x.id === trid);
-  if (!tr) return;
-  tr.checked = !tr.checked;
-  saveState(); renderMyList();
-}
-export function removeTrophy(tid, trid) {
-  const t = state.myList.find(x => x.id === tid);
-  if (!t) return;
-  t.trophies = t.trophies.filter(x => x.id !== trid);
-  saveState(); renderMyList();
-}
 export function addCustom() {
   if (!state.settings.allowCustomTrainees) return;
   const input = document.getElementById('custom-name');
@@ -397,70 +350,39 @@ export function addCustom() {
   input.value = "";
 }
 
-function backupFilename() {
-  const d = new Date();
-  const pad = n => String(n).padStart(2, '0');
-  const yy = pad(d.getFullYear() % 100);
-  const mm = pad(d.getMonth() + 1);
-  const dd = pad(d.getDate());
-  const hh = pad(d.getHours());
-  const mi = pad(d.getMinutes());
-  const ss = pad(d.getSeconds());
-  return `CompBoard-${yy}${mm}${dd}-${hh}${mi}${ss}.json`;
-}
-export function exportList() {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = backupFilename();
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-function importListFromJsonText(text) {
-  try {
-    const parsed = JSON.parse(text);
-    if (!parsed || !Array.isArray(parsed.myList)) throw new Error("bad format");
-    const knownNames = new Set(state.myList.map(trainee => trainee.name.toLocaleLowerCase()));
-    const trainees = normalizeImportedTrainees(parsed.myList, state.myList).filter(trainee => {
-      const key = trainee.name.toLocaleLowerCase();
-      if (knownNames.has(key)) return false;
-      knownNames.add(key);
-      return true;
-    });
-    state.myList.push(...trainees);
-    saveState(); renderMainView();
-    if (trainees.length !== parsed.myList.length) {
-      alert(`Imported ${trainees.length} trainee${trainees.length === 1 ? '' : 's'}. Duplicate or invalid entries were skipped.`);
-    }
-    return true;
-  } catch (e) {
-    alert("Couldn't read that — expected a Completionist Board export.");
-    return false;
-  }
-}
-export function importListFromText(text) {
-  return importListFromJsonText(text);
-}
-export function importList(file) {
-  const reader = new FileReader();
-  reader.onload = () => { importListFromJsonText(reader.result); };
-  reader.readAsText(file);
-}
-
 function wireBlockCollapse(toggleBtn, body) {
   if (!toggleBtn || !body) return;
+
+  body.classList.add('open', 'overflow-visible');
+  body.style.maxHeight = 'none';
+
+  const setArrow = (open) => {
+    const arrow = toggleBtn.querySelector('.cal-trainee-arrow');
+    if (arrow) arrow.classList.toggle('open', open);
+  };
+
   toggleBtn.addEventListener('click', () => {
     const willOpen = !body.classList.contains('open');
-    if (!willOpen) {
-      body.classList.remove('overflow-visible');
+    body.classList.remove('overflow-visible');
+
+    if (willOpen) {
+      body.style.maxHeight = '0px';
+      void body.offsetHeight;
+      body.classList.add('open');
+      body.style.maxHeight = body.scrollHeight + 'px';
+    } else {
+      body.style.maxHeight = body.scrollHeight + 'px';
+      void body.offsetHeight;
+      body.classList.remove('open');
+      body.style.maxHeight = '0px';
     }
-    body.classList.toggle('open', willOpen);
-    const arrow = toggleBtn.querySelector('.cal-trainee-arrow');
-    if (arrow) arrow.classList.toggle('open', willOpen);
+    setArrow(willOpen);
   });
+
   body.addEventListener('transitionend', (e) => {
     if (e.propertyName !== 'max-height') return;
     if (body.classList.contains('open')) {
+      body.style.maxHeight = 'none';
       body.classList.add('overflow-visible');
     }
   });

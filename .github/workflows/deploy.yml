@@ -28,9 +28,13 @@ jobs:
           TERSER="$(pwd)/node_modules/.bin/terser"
           CSSO="$(pwd)/node_modules/.bin/csso"
 
+          # $3 = space-separated list of optional module files to
+          # minify/check in addition to the common set. Lets the stable
+          # build (v4.3, no settings/render-bus split) skip them.
           build_one() {
             SRC="$1"
             DEST="$2"
+            EXTRA="${3:-}"
             mkdir -p "$DEST/data" "$DEST/icons"
 
             cp "$SRC/index.html" "$DEST/"
@@ -38,7 +42,7 @@ jobs:
             [ -f "$SRC/favicon.png" ] && cp "$SRC/favicon.png" "$DEST/" || true
             [ -d "$SRC/icons" ] && cp -R "$SRC/icons/." "$DEST/icons/" || true
 
-            for f in main core standard-view calendar; do
+            for f in main core standard-view calendar $EXTRA; do
               "$TERSER" "$SRC/$f.js" --module -c -m -o "$DEST/$f.js"
             done
 
@@ -48,13 +52,16 @@ jobs:
 
             "$CSSO" "$SRC/style.css" -o "$DEST/style.css"
 
-            for f in main core standard-view calendar data/database data/races; do
+            for f in main core standard-view calendar $EXTRA data/database data/races; do
               node --input-type=module --check < "$DEST/$f.js"
             done
           }
 
-          build_one "." "deploy"
-          build_one "preview" "deploy/preview"
+          # Stable (root) — no settings/render-bus yet.
+          build_one "." "deploy" ""
+
+          # Preview — has the two extra modules.
+          build_one "preview" "deploy/preview" "settings render-bus"
 
           [ -f CNAME ] && cp CNAME deploy/ || true
 
