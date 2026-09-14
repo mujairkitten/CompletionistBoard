@@ -125,7 +125,7 @@ body {
 }
 body.nav-top {
   padding-bottom: 0;
-  padding-top: calc(var(--topbar-h, 70px) + 20px);
+  padding-top: var(--topbar-h, 70px);
 }
 body.nav-top .topbar {
   top: 0;
@@ -150,7 +150,9 @@ body.nav-top .topbar {
   -webkit-backdrop-filter: none;
   border-top: 0;
   border-bottom: 0;
-  padding: 16px 0;
+  /* S1: match desktop's 10px vertical so the pill height stays stable
+     across the 960px breakpoint. */
+  padding: 10px 0;
   margin-top: 0;
   position: fixed;
   left: 0;
@@ -159,9 +161,6 @@ body.nav-top .topbar {
   bottom: 0;
   z-index: 90;
   pointer-events: none;
-}
-.topbar-inner > * {
-  pointer-events: auto;
 }
 .topbar-inner {
   display: flex;
@@ -179,12 +178,11 @@ body.nav-top .topbar {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 6px;
-  /* Transparent border keeps total box size identical across all three. */
+  padding: 4px;
   border: 1px solid transparent;
   /* Nested-radius formula: outer = inner button radius + padding.
-     Buttons use 12px → container uses 12 + 6 = 18px. */
-  border-radius: 18px;
+     Buttons use 12px → container uses 12 + 4 = 16px. */
+  border-radius: 16px;
   box-sizing: border-box;
 }
 .topbar-inner > .topbar-actions {
@@ -302,7 +300,7 @@ body.light .topbar-inner > .topbar-actions {
   gap: 10px;
   overflow: hidden;
   white-space: nowrap;
-  /* Rounder square. 12 + 6 (container padding) = 18 = container radius. */
+  /* Rounder square. 12 + 4 (container padding) = 16 = container radius. */
   border-radius: 12px;
   transition: box-shadow .15s ease, border-color .15s ease, color .15s ease, background-color .15s ease, transform .15s ease;
 }
@@ -451,7 +449,6 @@ body.nav-top .carotene-panel {
   height: 18px;
   display: none;
 }
-#nav-position-btn svg,
 #cal-exit-btn svg {
   display: block;
 }
@@ -1967,22 +1964,23 @@ footer {
     padding-left: 0;
     padding-right: 0;
   }
-  body.nav-bottom { padding-bottom: calc(78px + env(safe-area-inset-bottom)); }
-  body.nav-top { padding-top: calc(78px + env(safe-area-inset-top)); }
+  /* B1: track the measured topbar height instead of hardcoding 78px, so
+     body padding exactly matches the bar (padding + pill + padding). */
+  body.nav-bottom { padding-bottom: calc(var(--topbar-h, 70px) + env(safe-area-inset-bottom)); }
+  body.nav-top    { padding-top:    calc(var(--topbar-h, 70px) + env(safe-area-inset-top)); }
   body.nav-bottom .topbar,
   body.nav-top .topbar {
-    top: auto;
     right: 0;
-    bottom: auto;
     left: 0;
     width: auto;
-    height: 78px;
+    /* height removed — let it size to content */
     padding: 10px 18px;
     border-right: 0;
     border-left: 0;
     transition: none;
   }
-  body.nav-bottom .topbar { bottom: 0; }
+  body.nav-bottom .topbar { top: auto; bottom: 0; }
+  body.nav-top .topbar    { top: 0; bottom: auto; }
 }
 
 body.light .btn {
