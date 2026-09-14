@@ -31,12 +31,33 @@
 <div class="topbar">
   <div class="wrap topbar-inner">
     <div class="brand">
-      <h1>Completionist Board</h1>
+      <h1>
+        <svg class="brand-mark" viewBox="0 0 42 42" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <text x="50%" y="50%" dy=".35em" text-anchor="middle">CB</text>
+        </svg>
+        <span class="sr-only">Completionist Board</span>
+      </h1>
     </div>
     <div class="topbar-actions">
-      <button class="btn" id="backup-btn">Backup</button>
+      <div class="rail-nav" aria-label="Main navigation">
+        <button class="btn rail-action" id="rail-view-btn" type="button" aria-label="Calendar View" title="Calendar View" data-tooltip="Calendar View">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
+            <path d="M3 10H21M8 3V7M16 3V7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <button class="btn rail-action" id="backup-btn" type="button" aria-label="Backup" title="Backup" data-tooltip="Backup">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 3v11M8 10l4 4 4-4M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       <div class="settings-wrap">
-        <button class="btn icon-btn" id="settings-btn" aria-label="Settings" title="Settings">⚙</button>
+        <button class="btn icon-btn" id="settings-btn" aria-label="Settings" title="Settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.6-.94l-.36-2.54a.5.5 0 0 0-.5-.43h-3.84a.5.5 0 0 0-.5.43l-.36 2.54a7.03 7.03 0 0 0-1.6.94l-2.39-.96a.5.5 0 0 0-.6.22l-1.92 3.32a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.14.24.42.34.66.25l2.39-.96c.5.33 1.04.61 1.6.94l.36 2.54c.05.22.25.38.5.38h3.84c.25 0 .45-.16.5-.38l.36-2.54c.56-.33 1.1-.61 1.6-.94l2.39.96c.24.09.52-.01.66-.25l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58z" stroke-width="1.5"/>
+            <circle cx="12" cy="12" r="3.5" stroke-width="1.8" fill="none"/>
+          </svg>
+        </button>
         <div class="settings-panel" id="settings-panel">
           <div class="settings-group-label">Appearance</div>
           <div class="settings-row settings-row-icons">
@@ -60,12 +81,9 @@
                 <path d="M3 20H21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               </svg>
             </button>
-            <button class="icon-pill-btn" id="cal-enter-btn" aria-label="Open Calendar View" data-tooltip="Open Calendar View">
+            <button class="icon-pill-btn" id="nav-position-btn" aria-label="Move navbar" data-tooltip="Move navbar">
               <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
-                <path d="M3 10H21" stroke="currentColor" stroke-width="2"/>
-                <path d="M8 3V7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                <path d="M16 3V7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <path d="M7 7h8.5M15.5 7 13 4.5M15.5 7 13 9.5M17 17H8.5M8.5 17 11 14.5M8.5 17 11 19.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </button>
           </div>
@@ -84,6 +102,20 @@
           <div class="settings-divider"></div>
           <button class="btn small settings-about-btn" id="about-btn">About Completionist Board</button>
         </div>
+      </div>
+      </div>
+      <div class="rail-item-wrap carotene-wrap">
+        <button class="btn rail-action" id="carotene-btn" type="button" aria-label="Carotene" title="Carotene" data-tooltip="Carotene">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <g transform="rotate(45 12 12)">
+              <path d="M12 21C10.5 17 9 13.4 9 10.3C9 7.7 10.3 6.1 12 6.1C13.7 6.1 15 7.7 15 10.3C15 13.4 13.5 17 12 21Z" stroke-width="1.8"/>
+              <path d="M12 6.3C11 4.9 10 4.3 8.6 3.9" stroke-width="1.5"/>
+              <path d="M12 6.1C12 4.7 12 3.7 12 2.9" stroke-width="1.5"/>
+              <path d="M12 6.3C13 4.9 14 4.3 15.4 3.9" stroke-width="1.5"/>
+            </g>
+          </svg>
+        </button>
+        <div class="carotene-panel" id="carotene-panel" aria-hidden="true">Coming Soon</div>
       </div>
     </div>
   </div>
@@ -159,7 +191,7 @@
       <button class="modal-close" id="about-close" aria-label="Close">✕</button>
     </div>
     <div class="version-badge">
-      <div class="version-item"><span>Version</span><strong>v4.3</strong></div>
+      <div class="version-item"><span>Version</span><strong>v4.5-prev1</strong></div>
       <span class="version-divider" aria-hidden="true">|</span>
       <div class="version-item"><span>Database</span><strong>v2609a</strong></div>
     </div>
@@ -167,7 +199,7 @@
       <div class="about-section">
         <div class="about-section-label">Data</div>
         <p>Character aptitudes are consolidated from the Umamusume Wiki trainee tables across all Global costumes.</p>
-        <p>The race calendar includes 152 G1–G3 races. Out-of-Bond is for custom trophies without a fixed date.</p>
+        <p>The race calendar includes 152 G1-G3 races. Out-of-Bond is for custom trophies without a fixed date.</p>
       </div>
       <div class="about-section">
         <div class="about-section-label">Privacy &amp; backup</div>
@@ -175,7 +207,7 @@
       </div>
       <div class="about-section about-links">
         <div class="about-section-label">More</div>
-        <p>Want to return to the stable build? Open the <a href="../">Main version <span>(current ver.: 4.3)</span></a>.</p>
+        <p>Want to return to the stable build? Open the <a href="../">Main version <span>(current version: 4.3)</span></a>.</p>
         <p class="about-credit">2026, Mujairkitten · Made with various AI tools · Not affiliated with Cygames.<br>Source code is licensed under GPL-3. Uma icons follow <a href="https://umamusume.com/fan-createdguide">Cygames' Fan Content Guide</a>.</p>
       </div>
     </div>

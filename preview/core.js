@@ -50,7 +50,8 @@ function defaultSettings() {
     calendarViewMode: false,
     lightMode: false,
     colorTheme: 'turf',
-    activeTraineeId: null
+    activeTraineeId: null,
+    navbarPosition: 'right'
   };
 }
 export let state = {
@@ -163,6 +164,9 @@ function normalizeSettings(value, trainees) {
     if (typeof raw[key] === 'boolean') settings[key] = raw[key];
   }
   settings.colorTheme = raw.colorTheme === 'dirt' ? 'dirt' : 'turf';
+  settings.navbarPosition = ['left', 'bottom', 'right', 'top'].includes(raw.navbarPosition)
+    ? raw.navbarPosition
+    : 'right';
   if (typeof raw.activeTraineeId === 'string' && trainees.some(t => t.id === raw.activeTraineeId)) {
     settings.activeTraineeId = raw.activeTraineeId;
   }

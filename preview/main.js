@@ -2,6 +2,38 @@ import { state, loadState, saveState, debounce, wireChips } from './core.js';
 import { renderDatabase, renderMyList, addCustom, wireStandardViewControls, exportList, importList, importListFromText } from './standard-view.js';
 import { renderCalendarView, closeCalTraineePanel } from './calendar.js';
 
+const NAVBAR_POSITIONS = ['left', 'bottom', 'right', 'top'];
+const NAVBAR_POSITIONS_MOBILE = ['top', 'bottom'];
+
+function isDesktopViewport() {
+  return window.matchMedia('(min-width: 960px)').matches;
+}
+
+function updateRailViewButton() {
+  const button = document.getElementById('rail-view-btn');
+  if (!button) return;
+  const isCalendar = !!state.settings.calendarViewMode;
+  const label = isCalendar ? 'Database' : 'Calendar View';
+  button.setAttribute('aria-label', label);
+  button.title = label;
+  button.dataset.tooltip = label;
+  button.innerHTML = isCalendar
+    ? `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><ellipse cx="12" cy="5" rx="7.5" ry="3" stroke="currentColor" stroke-width="2"/><path d="M4.5 5v7c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3V5M4.5 12v7c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3v-7" stroke="currentColor" stroke-width="2"/></svg>`
+    : `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3 10H21M8 3V7M16 3V7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+}
+
+function updateNavbarPositionButton() {
+  const button = document.getElementById('nav-position-btn');
+  if (!button) return;
+  const positions = isDesktopViewport() ? NAVBAR_POSITIONS : NAVBAR_POSITIONS_MOBILE;
+  const current = state.settings.navbarPosition || 'right';
+  const idx = positions.indexOf(current);
+  const safeIdx = idx === -1 ? 0 : idx;
+  const next = positions[(safeIdx + positions.length - 1) % positions.length];
+  button.setAttribute('aria-label', `Move navbar to ${next}`);
+  button.dataset.tooltip = `Move navbar to ${next}`;
+}
+
 export function renderMainView() {
   const standard = document.getElementById('standard-view');
   const calView = document.getElementById('calendar-view');
@@ -34,8 +66,12 @@ export function applySettingsUI() {
     trainRow.style.display = state.settings.allowCustomTrainees ? '' : 'none';
   }
 
-  if (settingsBtn) settingsBtn.style.display = state.settings.calendarViewMode ? 'none' : '';
-  if (backupBtn) backupBtn.style.display = state.settings.calendarViewMode ? 'none' : '';
+  if (settingsBtn) settingsBtn.style.display = '';
+  if (backupBtn) backupBtn.style.display = '';
+  updateRailViewButton();
+  updateNavbarPositionButton();
+  document.body.classList.remove('nav-left', 'nav-bottom', 'nav-right', 'nav-top');
+  document.body.classList.add(`nav-${state.settings.navbarPosition || 'right'}`);
 }
 
 export function closeSettingsPanel() {
@@ -94,6 +130,16 @@ export function setCalendarViewMode(value) {
   state.settings.calendarViewMode = value;
   saveState(); applySettingsUI(); renderMainView();
   closeSettingsPanel();
+}
+export function cycleNavbarPosition() {
+  const positions = isDesktopViewport() ? NAVBAR_POSITIONS : NAVBAR_POSITIONS_MOBILE;
+  const current = state.settings.navbarPosition || 'right';
+  const idx = positions.indexOf(current);
+  const safeIdx = idx === -1 ? 0 : idx;
+  state.settings.navbarPosition = positions[(safeIdx + positions.length - 1) % positions.length];
+  saveState();
+  applySettingsUI();
+  syncTopbarHeight();
 }
 
 let exportCooldownUntil = 0;
@@ -229,22 +275,59 @@ async function init() {
 
   const modeToggleBtn = document.getElementById('mode-toggle-btn');
   const themeToggleBtn = document.getElementById('theme-toggle-btn');
-  const calEnterBtn = document.getElementById('cal-enter-btn');
+  const navPositionBtn = document.getElementById('nav-position-btn');
+  const caroteneBtn = document.getElementById('carotene-btn');
+  const railViewBtn = document.getElementById('rail-view-btn');
   const trainToggle = document.getElementById('toggle-custom-trainee');
   const trophyToggle = document.getElementById('toggle-custom-trophy');
 
   if (modeToggleBtn) modeToggleBtn.addEventListener('click', toggleMode);
   if (themeToggleBtn) themeToggleBtn.addEventListener('click', toggleColorTheme);
-  if (calEnterBtn) calEnterBtn.addEventListener('click', (e) => {
+  if (navPositionBtn) navPositionBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    setCalendarViewMode(true);
+    cycleNavbarPosition();
+  });
+  if (caroteneBtn) caroteneBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const panel = document.getElementById('carotene-panel');
+    if (!panel) return;
+    const isShown = panel.style.display === '' || panel.style.display === 'block';
+    panel.style.display = isShown ? 'none' : 'block';
+    panel.setAttribute('aria-hidden', isShown ? 'true' : 'false');
+  });
+  if (railViewBtn) railViewBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const showCalendar = !state.settings.calendarViewMode;
+    setCalendarViewMode(showCalendar);
+    if (!showCalendar) requestAnimationFrame(() => document.getElementById('db-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   });
   if (trainToggle) trainToggle.addEventListener('change', () => setAllowCustomTrainees(trainToggle.checked));
   if (trophyToggle) trophyToggle.addEventListener('change', () => setAllowCustomTrophies(trophyToggle.checked));
 
-  document.addEventListener('click', () => {
+  document.addEventListener('click', (e) => {
+    // Close carotene panel when clicking outside
+    const panel = document.getElementById('carotene-panel');
+    const btn = document.getElementById('carotene-btn');
+    if (panel && btn) {
+      const target = e.target;
+      if (!panel.contains(target) && !btn.contains(target)) {
+        panel.style.display = 'none';
+        panel.setAttribute('aria-hidden', 'true');
+      }
+    }
     closeSettingsPanel();
     closeCalTraineePanel();
+  });
+
+  // Close carotene panel on Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const panel = document.getElementById('carotene-panel');
+      if (panel) {
+        panel.style.display = 'none';
+        panel.setAttribute('aria-hidden', 'true');
+      }
+    }
   });
 }
 init();
