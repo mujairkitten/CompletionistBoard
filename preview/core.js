@@ -1,4 +1,4 @@
-import { RACES } from './data/races.js';
+import { RACES } from '../data/races.js';
 import { renderMyList, renderDatabase } from './render-bus.js';
 
 export const GRADES = ["A", "B", "C", "D", "E", "F", "G"];

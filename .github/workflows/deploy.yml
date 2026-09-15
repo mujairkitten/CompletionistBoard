@@ -15,6 +15,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verify shared data layout
+        run: |
+          # Option 2: preview borrows Main's data via ../data/. The preview
+          # tree must NOT contain its own data/ folder, and preview JS must
+          # not import from ./data/ — both would silently shadow the shared
+          # copy and could drift out of sync with the Main build.
+
+          if [ -d preview/data ]; then
+            echo "::error::preview/data/ exists."
+            echo "Option 2 expects preview to import from ../data/ instead."
+            echo "Delete preview/data/ and update the JS imports, then re-push."
+            exit 1
+          fi
+
+          MATCHES="$(grep -rnE "from ['\"]\./data/" preview --include='*.js' || true)"
+          if [ -n "$MATCHES" ]; then
+            echo "::error::Preview still imports from ./data/:"
+            echo "$MATCHES"
+            echo "Change these to ../data/ to reach Main's shared copy."
+            exit 1
+          fi
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -28,14 +51,20 @@ jobs:
           TERSER="$(pwd)/node_modules/.bin/terser"
           CSSO="$(pwd)/node_modules/.bin/csso"
 
-          # $3 = space-separated list of optional module files to
-          # minify/check in addition to the common set. Lets the stable
-          # build (v4.3, no settings/render-bus split) skip them.
+          # $3 = space-separated list of extra module files to minify/check
+          #      (lets Main and Preview have different module graphs).
+          # $4 = 'yes' if this source tree owns its own data/ folder.
+          #      Main: yes. Preview: no — it imports from ../data/.
           build_one() {
             SRC="$1"
             DEST="$2"
             EXTRA="${3:-}"
-            mkdir -p "$DEST/data" "$DEST/icons"
+            OWN_DATA="${4:-yes}"
+
+            mkdir -p "$DEST/icons"
+            if [ "$OWN_DATA" = "yes" ]; then
+              mkdir -p "$DEST/data"
+            fi
 
             cp "$SRC/index.html" "$DEST/"
             # Preview reuses the root favicon via ../favicon.png, so it has no local copy.
@@ -46,22 +75,29 @@ jobs:
               "$TERSER" "$SRC/$f.js" --module -c -m -o "$DEST/$f.js"
             done
 
-            for f in database races; do
-              "$TERSER" "$SRC/data/$f.js" --module -c -m -o "$DEST/data/$f.js"
-            done
+            if [ "$OWN_DATA" = "yes" ]; then
+              for f in database races; do
+                "$TERSER" "$SRC/data/$f.js" --module -c -m -o "$DEST/data/$f.js"
+              done
+            fi
 
             "$CSSO" "$SRC/style.css" -o "$DEST/style.css"
 
-            for f in main core standard-view calendar $EXTRA data/database data/races; do
+            for f in main core standard-view calendar $EXTRA; do
               node --input-type=module --check < "$DEST/$f.js"
             done
+            if [ "$OWN_DATA" = "yes" ]; then
+              for f in data/database data/races; do
+                node --input-type=module --check < "$DEST/$f.js"
+              done
+            fi
           }
 
-          # Stable (root) — no settings/render-bus yet.
-          build_one "." "deploy" ""
+          # Main owns its data.
+          build_one "." "deploy" "" "yes"
 
-          # Preview — has the two extra modules.
-          build_one "preview" "deploy/preview" "settings render-bus"
+          # Preview borrows Main's data via ../data/.
+          build_one "preview" "deploy/preview" "settings render-bus" "no"
 
           [ -f CNAME ] && cp CNAME deploy/ || true
 

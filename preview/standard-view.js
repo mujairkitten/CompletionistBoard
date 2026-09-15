@@ -1,5 +1,5 @@
-import { DATABASE } from './data/database.js';
-import { RACES, TRACK_TO_APT_KEY, DIST_TO_APT_KEY } from './data/races.js';
+import { DATABASE } from '../data/database.js';
+import { RACES, TRACK_TO_APT_KEY, DIST_TO_APT_KEY } from '../data/races.js';
 import {
   state, escapeHtml, escapeAttr, gradeOf, GRADE_INFO,
   aptGroupsHtml, wireChips, iconHtml, weakAptitudes, sortRowsByMode, raceDateLabel, debounce,
