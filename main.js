@@ -34,8 +34,8 @@ export function applySettingsUI() {
     trainRow.style.display = state.settings.allowCustomTrainees ? '' : 'none';
   }
 
-  if (settingsBtn) settingsBtn.style.display = state.settings.calendarViewMode ? 'none' : '';
-  if (backupBtn) backupBtn.style.display = state.settings.calendarViewMode ? 'none' : '';
+  if (settingsBtn) settingsBtn.style.display = '';
+  if (backupBtn) backupBtn.style.display = '';
 }
 
 export function closeSettingsPanel() {
