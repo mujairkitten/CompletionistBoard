@@ -180,6 +180,13 @@ function syncTopbarHeight() {
 }
 
 async function init() {
+  // Guard against double evaluation: the deploy stamps ?v= onto the entry
+  // script, but standard-view.js imports bare './main.js'. Query strings are
+  // part of module identity, so browsers evaluate both URLs as separate
+  // module instances — running init twice, attaching every listener twice,
+  // and making each toggle cancel itself. First instance wins.
+  if (window.__cbMainInitDone) return;
+  window.__cbMainInitDone = true;
   await loadState();
   applySettingsUI();
   renderMainView();
