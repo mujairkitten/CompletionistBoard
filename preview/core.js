@@ -43,6 +43,8 @@ const SAFE_ID = /^[a-z0-9]{7}$/;
 const MAX_NAME_LENGTH = 120;
 const MAX_NOTE_LENGTH = 500;
 const MAX_TROPHIES_PER_TRAINEE = 300;
+export const MAX_MY_LIST = 1000;
+export const MAX_IMPORT_TRAINEES = 500;
 const VALID_CAL_MONTHS = new Set([
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"
@@ -236,26 +238,75 @@ export async function loadState() {
   } catch (e) { console.error("Storage load failed", e); }
   state = normalizeState(parsed);
 }
+let saveTimer = null;
+let saveFlush = null;
 export function saveState() {
-  let snapshot;
-  try {
-    snapshot = JSON.stringify(state);
-  } catch (e) {
-    console.error("Storage serialization failed", e);
-    return Promise.resolve();
+  // Coalesce rapid toggles/drags into one trailing write; snapshot at flush.
+  if (!saveFlush) {
+    saveFlush = new Promise((resolve) => {
+      saveTimer = setTimeout(async () => {
+        saveTimer = null;
+        let snapshot;
+        try {
+          snapshot = JSON.stringify(state);
+        } catch (e) {
+          console.error("Storage serialization failed", e);
+          saveFlush = null;
+          resolve();
+          return;
+        }
+        saveQueue = saveQueue.catch(() => {}).then(async () => {
+          try {
+            if (window.storage && typeof window.storage.set === 'function') {
+              await window.storage.set('mylist', snapshot, false);
+            } else {
+              localStorage.setItem('mylist', snapshot);
+            }
+          } catch (e) {
+            console.error("Storage save failed", e);
+            const isQuota = e && (e.name === 'QuotaExceededError' || e.code === 22);
+            const message = isQuota
+              ? "Storage is full — your latest change may not persist. Remove old trainees or export a backup."
+              : "Couldn't save your list in this browser.";
+            try {
+              window.dispatchEvent(new CustomEvent('cb-toast', { detail: { message, kind: 'error' } }));
+            } catch (_) { /* ignore toast bridge failures */ }
+          }
+        });
+        await saveQueue;
+        saveFlush = null;
+        resolve();
+      }, 150);
+    });
   }
-  saveQueue = saveQueue.catch(() => {}).then(async () => {
-    try {
-      if (window.storage && typeof window.storage.set === 'function') {
-        await window.storage.set('mylist', snapshot, false);
-      } else {
-        localStorage.setItem('mylist', snapshot);
+  return saveFlush;
+}
+
+/* Re-run a render while keeping keyboard focus on the invoking control.
+ * Matches by stable id, else by data attrs within the same id'd container. */
+export function withFocusKept(fn) {
+  const a = typeof document !== 'undefined' ? document.activeElement : null;
+  let restore = null;
+  if (a && a.isConnected && a !== document.body) {
+    if (a.id) {
+      const id = a.id;
+      restore = () => document.getElementById(id)?.focus({ preventScroll: true });
+    } else if (a.dataset) {
+      const d = a.dataset;
+      const host = a.closest ? a.closest('[id]') : null;
+      const key = d.page !== undefined && d.page !== ''
+        ? `[data-page="${CSS.escape(d.page)}"]`
+        : d.pageAction ? `[data-page-action="${d.pageAction}"]`
+        : (d.move && d.race) ? `.cal-race-move[data-race="${CSS.escape(d.race)}"][data-move="${d.move}"]`
+        : null;
+      if (host && host.id && key) {
+        const hid = host.id;
+        restore = () => document.getElementById(hid)?.querySelector(key)?.focus({ preventScroll: true });
       }
-    } catch (e) {
-      console.error("Storage save failed", e);
     }
-  });
-  return saveQueue;
+  }
+  fn();
+  try { restore?.(); } catch (_) { /* focus restore is best-effort */ }
 }
 
 /* ---------- Escaping ---------- */
@@ -286,13 +337,18 @@ function positionTooltip(target) {
   const el = ensureTooltipEl();
   if (!target || !el) return;
   const rect = target.getBoundingClientRect();
-  const tooltipWidth = el.getBoundingClientRect().width;
-  el.style.left = Math.min(rect.left, window.innerWidth - tooltipWidth - 16) + "px";
+  const tipRect = el.getBoundingClientRect();
+  const tooltipWidth = tipRect.width;
+  const tooltipHeight = tipRect.height;
   const gap = 8;
-  const tooltipHeight = el.getBoundingClientRect().height;
+  const left = Math.max(gap, Math.min(rect.left, window.innerWidth - tooltipWidth - 16));
+  el.style.left = left + "px";
   let top = rect.top - tooltipHeight - gap;
   if (top < gap) top = rect.bottom + gap;
-  el.style.top = top + "px";
+  // Clamp bottom edge so flipped-below tooltips stay onscreen.
+  top = Math.min(top, window.innerHeight - tooltipHeight - gap);
+  if (top < gap) top = gap;
+  el.style.top = Math.max(top, gap) + "px";
   el.classList.add('show');
   el.setAttribute('aria-hidden', 'false');
 }
@@ -350,7 +406,6 @@ function repositionTooltip() {
 document.addEventListener('scroll', repositionTooltip, true);
 window.addEventListener('resize', repositionTooltip);
 
-export const CHEVRON_SVG = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 export function chipHtml(apt, key) {
   const cat = CATS.find(c => c.key === key);
   const value = apt[key];
@@ -358,6 +413,9 @@ export function chipHtml(apt, key) {
   const alt = altOf(value);
   const tier = GRADE_INFO[grade].tier;
   const label = `${cat.label} ${grade}${alt ? '/' + alt.alt : ''}`;
+  const tipTable = cat.group === 'surface' ? GRADE_TIP_SURFACE : GRADE_TIP_DISTANCE;
+  const pct = tipTable[grade] ? tipTable[grade].pct : '';
+  const ariaLabel = `${cat.label} aptitude ${grade}${alt ? ', alternate ' + alt.alt : ''}, ${cat.stat} ${pct}`;
   const borderMix = `color-mix(in srgb, var(--${tier}) 55%, transparent)`;
   const glowMix = `color-mix(in srgb, var(--${tier}) 40%, transparent)`;
   let bg = `color-mix(in srgb, var(--${tier}) 24%, transparent)`;
@@ -368,7 +426,7 @@ export function chipHtml(apt, key) {
   const style = `--chip-bg:${bg};--chip-border:${borderMix};--chip-glow:${glowMix};`;
   // N6: escapeAttr round-trips correctly for any string (including literal `&amp;`).
   const safeJson = escapeAttr(JSON.stringify(value));
-  return `<button class="chip" style="${style}" data-cat="${key}" data-json='${safeJson}'>${label}</button>`;
+  return `<span class="chip" tabindex="0" role="img" style="${style}" data-cat="${key}" data-json='${safeJson}' aria-label="${escapeAttr(ariaLabel)}" aria-describedby="tooltip">${label}</span>`;
 }
 export function aptGroupsHtml(apt) {
   return `<div class="apt-groups">
@@ -391,7 +449,9 @@ export function wireChips(root) {
     const chip = e.target.closest('.chip');
     if (chip && root.contains(chip)) {
       if (chip.contains(e.relatedTarget)) return;
-      showTooltip(chip, chip.dataset.cat, JSON.parse(chip.dataset.json));
+      try {
+        showTooltip(chip, chip.dataset.cat, JSON.parse(chip.dataset.json));
+      } catch (_) { /* ignore tampered chip payloads */ }
       return;
     }
     const iconBtn = e.target.closest('[data-tooltip]');
@@ -416,7 +476,9 @@ export function wireChips(root) {
   root.addEventListener('focusin', (e) => {
     const chip = e.target.closest('.chip');
     if (chip && root.contains(chip)) {
-      showTooltip(chip, chip.dataset.cat, JSON.parse(chip.dataset.json));
+      try {
+        showTooltip(chip, chip.dataset.cat, JSON.parse(chip.dataset.json));
+      } catch (_) { /* ignore tampered chip payloads */ }
       return;
     }
     const iconBtn = e.target.closest('[data-tooltip]');
@@ -441,9 +503,9 @@ export function slugify(name) {
 }
 export function iconHtml(name, size) {
   const slug = slugify(name);
-  const initial = (name.trim()[0] || '?').toUpperCase();
+  const initial = escapeHtml((name.trim()[0] || '?').toUpperCase());
   return `<div class="trainee-icon" style="--icon-size:${size}px">
-  <img src="../icons/${slug}.png" alt="" loading="lazy">
+  <img src="../icons/${slug}.png" alt="" loading="lazy" decoding="async">
   <span class="icon-fallback">${initial}</span>
 </div>`;
 }
@@ -490,41 +552,87 @@ export function raceMeta(race) {
 
 /* ---------- State actions (render via bus to avoid cycles) ---------- */
 
-export function addToMyList(name, apt) {
+export function addToMyList(name, apt, opts = {}) {
+  const { announce = true } = opts;
   const normalizedName = traineeNameKey(name);
-  if (!normalizedName) return;
-  if (state.myList.some(t => traineeNameKey(t.name) === normalizedName)) return;
-  const canonicalName = name.normalize('NFKC').trim().replace(/\s+/g, ' ');
-  state.myList.push({ id: uid(), name: canonicalName, aptitudes: apt, trophies: [] });
+  if (!normalizedName) return null;
+  if (state.myList.some(t => traineeNameKey(t.name) === normalizedName)) {
+    if (announce) showToast(`“${name.normalize('NFKC').trim().replace(/\s+/g, ' ')}” is already in My List.`);
+    return null;
+  }
+  if (state.myList.length >= MAX_MY_LIST) {
+    if (announce) showToast(`My List is full (${MAX_MY_LIST}). Remove someone first.`, { kind: 'error' });
+    return null;
+  }
+  const canonicalName = safeText(name.normalize('NFKC').trim().replace(/\s+/g, ' '), MAX_NAME_LENGTH);
+  if (!canonicalName) return null;
+  const trainee = { id: uid(), name: canonicalName, aptitudes: apt, trophies: [] };
+  state.myList.push(trainee);
   saveState();
   renderMyList();
   renderDatabase();
+  if (announce) showToast(`Added ${canonicalName} to My List.`, {
+    actionLabel: 'View',
+    duration: 8000,
+    onAction: () => {
+      window.dispatchEvent(new CustomEvent('cb-view-trainee', { detail: { id: trainee.id } }));
+    }
+  });
+  return trainee;
 }
 
 export function removeFromMyList(id) {
-  state.myList = state.myList.filter(t => t.id !== id);
+  const index = state.myList.findIndex(t => t.id === id);
+  if (index === -1) return;
+  const [removed] = state.myList.splice(index, 1);
   if (state.settings.activeTraineeId === id) {
     state.settings.activeTraineeId = state.myList.length ? state.myList[0].id : null;
   }
   saveState();
   renderMyList();
   renderDatabase();
+  showToast(`Removed ${removed.name}`, {
+    actionLabel: 'Undo',
+    duration: 8000,
+    onAction: () => {
+      const at = Math.min(index, state.myList.length);
+      state.myList.splice(at, 0, removed);
+      saveState();
+      renderMyList();
+      renderDatabase();
+    }
+  });
 }
 
 export function addTrophy(tid, name, meta) {
-  name = (name || "").trim();
-  if (!name) return;
+  const clean = safeText(name, MAX_NAME_LENGTH);
+  if (!clean) return false;
   const t = state.myList.find(x => x.id === tid);
-  if (!t) return;
-  const normalizedName = name.toLowerCase();
-  if (t.trophies.some(tr => tr.name.toLowerCase() === normalizedName)) return;
-  const trophy = { id: uid(), name, checked: false };
+  if (!t) return false;
+  if (t.trophies.length >= MAX_TROPHIES_PER_TRAINEE) {
+    showToast(`${t.name} already has ${MAX_TROPHIES_PER_TRAINEE} trophies.`, { kind: 'error' });
+    return false;
+  }
+  const key = traineeNameKey(clean);
+  if (t.trophies.some(tr => traineeNameKey(tr.name) === key)) return false;
+  const trophy = { id: uid(), name: clean, checked: false };
   if (meta) {
     trophy.grade = meta.grade; trophy.track = meta.track; trophy.distance = meta.distance;
     trophy.year = meta.year; trophy.turn = meta.turn; trophy.month = meta.month;
   }
   t.trophies.push(trophy);
   saveState(); renderMyList();
+  return true;
+}
+
+export function setTrophyChecked(tid, trid, checked) {
+  const t = state.myList.find(x => x.id === tid);
+  if (!t) return null;
+  const tr = t.trophies.find(x => x.id === trid);
+  if (!tr) return null;
+  tr.checked = checked;
+  saveState();
+  return { trainee: t, trophy: tr };
 }
 
 export function toggleTrophy(tid, trid) {
@@ -539,14 +647,146 @@ export function toggleTrophy(tid, trid) {
 export function removeTrophy(tid, trid) {
   const t = state.myList.find(x => x.id === tid);
   if (!t) return;
-  t.trophies = t.trophies.filter(x => x.id !== trid);
+  const index = t.trophies.findIndex(x => x.id === trid);
+  if (index === -1) return;
+  const [removed] = t.trophies.splice(index, 1);
   saveState(); renderMyList();
+  showToast(`Removed ${removed.name}`, {
+    actionLabel: 'Undo',
+    duration: 8000,
+    onAction: () => {
+      const host = state.myList.find(x => x.id === tid);
+      if (!host) {
+        showToast(`Couldn't undo — ${t.name} is no longer in My List.`, { kind: 'error' });
+        return;
+      }
+      host.trophies.splice(Math.min(index, host.trophies.length), 0, removed);
+      saveState(); renderMyList();
+    }
+  });
 }
 
 export function addTrophyFromInput(tid, rawName) {
   const name = (rawName || "").trim();
-  if (!name) return;
+  if (!name) return false;
   const race = findRaceByExactName(name);
-  if (!race && !state.settings.allowCustomTrophies) return;
-  addTrophy(tid, name, race ? raceMeta(race) : null);
+  if (!race && !state.settings.allowCustomTrophies) {
+    showToast("Custom trophies are disabled in settings.", { kind: 'error' });
+    return false;
+  }
+  return addTrophy(tid, name, race ? raceMeta(race) : null);
+}
+
+/* Contrast-checked tag foregrounds (measured 2026-09-20):
+ * bright tier greens/yellow/orange (a-f, g3) read best with dark text
+ * (6-12:1 vs 1.5-3:1 for white); only the dark bgs g (#c23f5a, 5.06:1)
+ * and g1 (#2f6fd0, 4.88:1) need white text. */
+const LIGHT_TEXT_TAG_VARS = new Set(['g1', 'g']);
+export function tagFgForVar(varName) {
+  return LIGHT_TEXT_TAG_VARS.has(varName) ? '#fff' : '#12141a';
+}
+
+export function wireTabArrowNav(container) {
+  if (!container || container.dataset.tabsWired) return;
+  container.dataset.tabsWired = 'true';
+  container.addEventListener('keydown', (e) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    const tabs = [...container.querySelectorAll('[role="tab"]')];
+    if (tabs.length < 2) return;
+    e.preventDefault();
+    const idx = tabs.indexOf(document.activeElement);
+    const current = idx === -1 ? tabs.findIndex(t => t.classList.contains('active')) : idx;
+    let next = current;
+    if (e.key === 'ArrowRight') next = (current + 1) % tabs.length;
+    if (e.key === 'ArrowLeft') next = (current - 1 + tabs.length) % tabs.length;
+    if (e.key === 'Home') next = 0;
+    if (e.key === 'End') next = tabs.length - 1;
+    tabs[next].focus();
+    tabs[next].click();
+  });
+}
+
+/* ---------- Toast (undo + status) ----------
+ * Stacked (max 3); error toasts share one slot so bursts can't pile up
+ * or clobber Undo toasts; auto-dismiss waits out :focus-within. */
+const MAX_TOASTS = 3;
+let errorToast = null;
+function armToastDismiss(el, duration) {
+  if (duration <= 0) return null;
+  const clearIfUnfocused = () => {
+    if (el.contains(document.activeElement)) {
+      el._retry = setTimeout(clearIfUnfocused, 1000);
+      return;
+    }
+    el.remove();
+    if (errorToast === el) errorToast = null;
+  };
+  return setTimeout(clearIfUnfocused, duration);
+}
+export function showToast(message, opts = {}) {
+  let region = document.getElementById('toast-region');
+  if (!region) {
+    // Self-heal: older cached HTML may lack the region — create it so
+    // toasts never silently vanish.
+    region = document.createElement('div');
+    region.id = 'toast-region';
+    region.className = 'toast-region';
+    region.setAttribute('aria-live', 'polite');
+    region.setAttribute('aria-atomic', 'true');
+    document.body.appendChild(region);
+  }
+  const { actionLabel, onAction, kind = 'info', duration = 5000 } = opts;
+  if (kind === 'error' && errorToast && errorToast.isConnected) {
+    errorToast.querySelector('span').textContent = message;
+    if (errorToast._timer) clearTimeout(errorToast._timer);
+    if (errorToast._retry) clearTimeout(errorToast._retry);
+    errorToast._timer = armToastDismiss(errorToast, duration);
+    return errorToast;
+  }
+  while (region.children.length >= MAX_TOASTS) region.firstChild.remove();
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.setAttribute('role', 'status');
+  const text = document.createElement('span');
+  text.textContent = message;
+  el.appendChild(text);
+  if (actionLabel && typeof onAction === 'function') {
+    const btn = document.createElement('button');
+    btn.className = 'btn small';
+    btn.textContent = actionLabel;
+    btn.addEventListener('click', () => {
+      onAction();
+      if (el._timer) clearTimeout(el._timer);
+      if (el._retry) clearTimeout(el._retry);
+      el.remove();
+      if (errorToast === el) errorToast = null;
+    });
+    el.appendChild(btn);
+  }
+  if (kind === 'error') {
+    el.style.borderColor = 'var(--f)';
+    errorToast = el;
+  }
+  region.appendChild(el);
+  el._timer = armToastDismiss(el, duration);
+  return el;
+}
+
+window.addEventListener('cb-toast', (e) => {
+  const detail = e && e.detail ? e.detail : {};
+  showToast(detail.message || 'Something happened.', { kind: detail.kind || 'info' });
+});
+
+/* Polite one-shot announcements for silent visual toggles (no toast spam). */
+export function announce(message) {
+  let el = document.getElementById('sr-announcer');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'sr-announcer';
+    el.className = 'sr-only';
+    el.setAttribute('aria-live', 'polite');
+    document.body.appendChild(el);
+  }
+  el.textContent = '';
+  requestAnimationFrame(() => { el.textContent = message; });
 }

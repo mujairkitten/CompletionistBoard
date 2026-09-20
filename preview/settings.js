@@ -1,4 +1,4 @@
-import { state, saveState, normalizeImportedTrainees, normalizeSettings, traineeNameKey } from './core.js';
+import { state, saveState, normalizeImportedTrainees, normalizeSettings, traineeNameKey, wireTabArrowNav, showToast, announce, MAX_MY_LIST, MAX_IMPORT_TRAINEES } from './core.js';
 import { renderMainView } from './render-bus.js';
 
 const NAVBAR_POSITIONS_DESKTOP = ['left', 'bottom', 'right', 'top'];
@@ -19,7 +19,12 @@ function activeNavbarPosition() {
 export function syncTopbarHeight() {
   const topbar = document.querySelector('.topbar');
   if (!topbar) return;
-  const height = topbar.getBoundingClientRect().height;
+  // In left/right mode the bar is a full-height rail — measuring it would
+  // push --topbar-h consumers (toast offset) off-screen. Measure the pill.
+  const vertical = document.body.classList.contains('nav-left')
+    || document.body.classList.contains('nav-right');
+  const target = (vertical ? topbar.querySelector('.topbar-actions') : null) || topbar;
+  const height = target.getBoundingClientRect().height;
   document.documentElement.style.setProperty('--topbar-h', `${height}px`);
 }
 
@@ -31,7 +36,7 @@ function updateRailViewButton() {
   const isCalendar = !!state.settings.calendarViewMode;
   const label = isCalendar ? 'Database' : 'Calendar View';
   button.setAttribute('aria-label', label);
-  button.title = label;
+  button.removeAttribute('title');
   button.dataset.tooltip = label;
   button.innerHTML = isCalendar
     ? `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><ellipse cx="12" cy="5" rx="7.5" ry="3" stroke="currentColor" stroke-width="2"/><path d="M4.5 5v7c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3V5M4.5 12v7c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3v-7" stroke="currentColor" stroke-width="2"/></svg>`
@@ -89,7 +94,13 @@ export function applySettingsUI() {
 
   if (settingsBtn) settingsBtn.style.display = '';
   if (backupBtn) backupBtn.style.display = '';
-  if (settingsPanel) wireSettingsPanelDismiss(settingsPanel);
+  if (settingsPanel) {
+    wireSettingsPanelDismiss(settingsPanel);
+    if (!settingsPanel.classList.contains('show')) {
+      settingsPanel.inert = true;
+      settingsPanel.setAttribute('aria-hidden', 'true');
+    }
+  }
   updateRailViewButton();
   applyNavbarPosition();
 }
@@ -107,14 +118,22 @@ export function applyNavbarPosition() {
 export function closeSettingsPanel() {
   const panel = document.getElementById('settings-panel');
   const btn = document.getElementById('settings-btn');
-  if (panel) panel.classList.remove('show');
+  if (panel) {
+    panel.classList.remove('show');
+    panel.inert = true;
+    panel.setAttribute('aria-hidden', 'true');
+  }
   if (btn) btn.setAttribute('aria-expanded', 'false');
 }
 
 export function openSettingsPanel() {
   const panel = document.getElementById('settings-panel');
   const btn = document.getElementById('settings-btn');
-  if (panel) panel.classList.add('show');
+  if (panel) {
+    panel.classList.add('show');
+    panel.inert = false;
+    panel.removeAttribute('aria-hidden');
+  }
   if (btn) btn.setAttribute('aria-expanded', 'true');
 }
 
@@ -128,10 +147,12 @@ export function toggleSettingsPanel() {
 export function toggleMode() {
   state.settings.lightMode = !state.settings.lightMode;
   saveState(); applySettingsUI();
+  announce(state.settings.lightMode ? 'Light mode on.' : 'Dark mode on.');
 }
 export function toggleColorTheme() {
   state.settings.colorTheme = state.settings.colorTheme === 'dirt' ? 'turf' : 'dirt';
   saveState(); applySettingsUI();
+  announce(state.settings.colorTheme === 'dirt' ? 'Dirt theme.' : 'Turf theme.');
 }
 export function setAllowCustomTrainees(value) {
   state.settings.allowCustomTrainees = value;
@@ -145,6 +166,7 @@ export function setCalendarViewMode(value) {
   state.settings.calendarViewMode = value;
   saveState(); applySettingsUI(); renderMainView();
   closeSettingsPanel();
+  announce(value ? 'Calendar view.' : 'Database view.');
 }
 
 export function setNavbarPosition(pos) {
@@ -158,16 +180,23 @@ export function setNavbarPosition(pos) {
   saveState();
   applySettingsUI();
   syncTopbarHeight();
+  announce(`Navbar ${pos}.`);
 }
 
 /* ---------- Modal focus management ---------- */
 
-let lastFocusedBeforeModal = null;
+const modalFocusStack = [];
 
 function focusablesIn(container) {
-  return container.querySelectorAll(
+  return [...container.querySelectorAll(
     'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
-  );
+  )].filter(el => el.getClientRects().length > 0);
+}
+
+function setBackgroundInert(on) {
+  for (const sel of ['.wrap', '#calendar-view', '.topbar']) {
+    document.querySelectorAll(sel).forEach(el => { el.inert = on; });
+  }
 }
 
 function onModalKeydown(e) {
@@ -191,9 +220,10 @@ function onModalKeydown(e) {
 
 function openModal(overlay) {
   if (!overlay) return;
-  lastFocusedBeforeModal = document.activeElement;
+  modalFocusStack.push(document.activeElement);
   overlay.classList.add('show');
   overlay.addEventListener('keydown', onModalKeydown);
+  setBackgroundInert(true);
   const target = overlay.querySelector('.modal-close');
   if (target) target.focus();
 }
@@ -202,10 +232,11 @@ function closeModal(overlay) {
   if (!overlay) return;
   overlay.classList.remove('show');
   overlay.removeEventListener('keydown', onModalKeydown);
-  if (lastFocusedBeforeModal && lastFocusedBeforeModal.isConnected) {
-    lastFocusedBeforeModal.focus();
+  const prev = modalFocusStack.pop();
+  if (document.querySelectorAll('.modal-overlay.show').length === 0) setBackgroundInert(false);
+  if (prev && prev.isConnected) {
+    prev.focus();
   }
-  lastFocusedBeforeModal = null;
 }
 
 /* ---------- About modal ---------- */
@@ -243,6 +274,7 @@ export function exportList() {
 
 export function importListFromText(text) {
   try {
+    if (typeof text !== 'string' || text.length > 2 * 1024 * 1024) throw new Error("bad format");
     const parsed = JSON.parse(text);
     if (!parsed || !Array.isArray(parsed.myList)) throw new Error("bad format");
 
@@ -252,8 +284,11 @@ export function importListFromText(text) {
       if (knownNames.has(key)) return false;
       knownNames.add(key);
       return true;
-    });
-    state.myList.push(...incoming);
+    }).slice(0, MAX_IMPORT_TRAINEES);
+    const room = Math.max(0, MAX_MY_LIST - state.myList.length);
+    const accepted = incoming.slice(0, room);
+    const overCap = incoming.length - accepted.length;
+    state.myList.push(...accepted);
 
     if (parsed.settings && typeof parsed.settings === 'object') {
       state.settings = normalizeSettings(parsed.settings, state.myList);
@@ -264,17 +299,24 @@ export function importListFromText(text) {
     renderMainView();
 
     const skipped = parsed.myList.length - incoming.length;
-    if (skipped > 0) {
-      alert(`Imported ${incoming.length} trainee${incoming.length === 1 ? '' : 's'}. ${skipped} duplicate or invalid entr${skipped === 1 ? 'y was' : 'ies were'} skipped.`);
-    }
+    const parts = [`Imported ${accepted.length} trainee${accepted.length === 1 ? '' : 's'}`];
+    if (skipped > 0) parts.push(`${skipped} duplicate or invalid entr${skipped === 1 ? 'y was' : 'ies were'} skipped`);
+    if (overCap > 0) parts.push(`list capped at ${MAX_MY_LIST}`);
+    showToast(parts.join('. ') + '.');
     return true;
   } catch (e) {
-    alert("Couldn't read that — expected a Completionist Board export.");
+    showToast("Couldn't read that — expected a Track Record export.", { kind: 'error' });
     return false;
   }
 }
 
 export function importList(file) {
+  if (!file) return;
+  const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
+  if (typeof file.size === 'number' && file.size > MAX_IMPORT_BYTES) {
+    showToast("That file is too large — expected a Track Record export under 2MB.", { kind: 'error' });
+    return;
+  }
   const reader = new FileReader();
   reader.onload = () => { importListFromText(reader.result); };
   reader.readAsText(file);
@@ -283,6 +325,12 @@ export function importList(file) {
 function refreshBackupExportText() {
   const textarea = document.getElementById('backup-export-text');
   if (textarea) textarea.value = JSON.stringify(state, null, 2);
+  const stamp = document.getElementById('backup-export-stamp');
+  if (stamp) {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    stamp.textContent = `Generated ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())} · ${state.myList.length} trainees`;
+  }
 }
 
 export function openBackupModal() {
@@ -291,7 +339,11 @@ export function openBackupModal() {
   const exportPanel = document.getElementById('backup-export-panel');
   const importPanel = document.getElementById('backup-import-panel');
   const tabs = document.querySelectorAll('#backup-tabs .cal-tab-btn');
-  tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === 'export'));
+  tabs.forEach(t => {
+    const on = t.dataset.tab === 'export';
+    t.classList.toggle('active', on);
+    t.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
   if (exportPanel) exportPanel.style.display = '';
   if (importPanel) importPanel.style.display = 'none';
   refreshBackupExportText();
@@ -299,6 +351,10 @@ export function openBackupModal() {
 }
 export function closeBackupModal() {
   closeModal(document.getElementById('backup-overlay'));
+  if (exportCooldownInterval) {
+    clearInterval(exportCooldownInterval);
+    exportCooldownInterval = null;
+  }
 }
 
 let exportCooldownUntil = 0;
@@ -333,6 +389,7 @@ function startExportCooldown() {
 export function wireBackupModal() {
   const backupOverlay = document.getElementById('backup-overlay');
   const backupClose = document.getElementById('backup-close');
+  const tabsEl = document.getElementById('backup-tabs');
   const tabs = document.querySelectorAll('#backup-tabs .cal-tab-btn');
   const exportPanel = document.getElementById('backup-export-panel');
   const importPanel = document.getElementById('backup-import-panel');
@@ -348,9 +405,14 @@ export function wireBackupModal() {
   }
   if (backupClose) backupClose.addEventListener('click', closeBackupModal);
 
+  if (tabsEl) wireTabArrowNav(tabsEl);
   tabs.forEach(tab => {
     tab.addEventListener('click', () => {
-      tabs.forEach(t => t.classList.toggle('active', t === tab));
+      tabs.forEach(t => {
+        const on = t === tab;
+        t.classList.toggle('active', on);
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
       const isExport = tab.dataset.tab === 'export';
       if (exportPanel) exportPanel.style.display = isExport ? '' : 'none';
       if (importPanel) importPanel.style.display = isExport ? 'none' : '';
@@ -359,9 +421,32 @@ export function wireBackupModal() {
   });
 
   if (exportFileBtn) exportFileBtn.addEventListener('click', () => {
-    if (Date.now() < exportCooldownUntil) return;
+    if (Date.now() < exportCooldownUntil) {
+      const remaining = Math.ceil((exportCooldownUntil - Date.now()) / 1000);
+      showToast(`Export is on cooldown — ready in ${remaining}s.`);
+      return;
+    }
     exportList();
+    showToast(`Exported ${state.myList.length} trainee${state.myList.length === 1 ? '' : 's'}.`);
     startExportCooldown();
+  });
+
+  const copyBtn = document.getElementById('backup-copy-btn');
+  if (copyBtn) copyBtn.addEventListener('click', async () => {
+    const textarea = document.getElementById('backup-export-text');
+    if (!textarea) return;
+    try {
+      await navigator.clipboard.writeText(textarea.value);
+      showToast('Backup JSON copied to clipboard.');
+    } catch (_) {
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showToast('Backup JSON copied to clipboard.');
+      } catch (__) {
+        showToast('Copy failed — select the text manually.', { kind: 'error' });
+      }
+    }
   });
 
   if (importTextBtn) importTextBtn.addEventListener('click', () => {

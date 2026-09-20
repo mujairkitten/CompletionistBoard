@@ -13,13 +13,16 @@ import {
 function renderMainView() {
   const standard = document.getElementById('standard-view');
   const calView = document.getElementById('calendar-view');
+  const skip = document.querySelector('.skip-link');
   if (state.settings.calendarViewMode) {
     if (standard) standard.style.display = 'none';
     if (calView) calView.style.display = '';
+    if (skip) skip.setAttribute('href', '#calendar-view');
     renderCalendarView();
   } else {
     if (standard) standard.style.display = '';
     if (calView) calView.style.display = 'none';
+    if (skip) skip.setAttribute('href', '#standard-view');
     renderDatabase();
     renderMyList();
   }
@@ -35,6 +38,7 @@ function closeCarotenePanel() {
 }
 
 async function init() {
+  console.info('[preview] build v5.0-rp1');
   setRenderHandlers({
     mainView: renderMainView,
     myList: () => { if (!state.settings.calendarViewMode) renderMyList(); },
@@ -52,8 +56,8 @@ async function init() {
     document.fonts.ready.then(() => syncTopbarHeight());
   }
   window.addEventListener('resize', debounce(() => {
-    syncTopbarHeight();
     applyNavbarPosition();
+    syncTopbarHeight();
   }, 150));
 
   const aboutOverlay = document.getElementById('about-overlay');
@@ -128,7 +132,10 @@ async function init() {
     e.stopPropagation();
     const showCalendar = !state.settings.calendarViewMode;
     setCalendarViewMode(showCalendar);
-    if (!showCalendar) requestAnimationFrame(() => document.getElementById('db-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    if (!showCalendar) requestAnimationFrame(() => {
+      const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      document.getElementById('db-grid')?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+    });
   });
 
   if (trainToggle) trainToggle.addEventListener('change', () => setAllowCustomTrainees(trainToggle.checked));
@@ -155,6 +162,7 @@ async function init() {
     closeAboutModal();
     closeBackupModal();
     closeSettingsPanel();
+    if (closeCalTraineePanel()) document.getElementById('cal-trainee-btn')?.focus();
   });
 }
 init();
