@@ -67,8 +67,8 @@ jobs:
             fi
 
             cp "$SRC/index.html" "$DEST/"
-            # Preview reuses the root favicon via ../favicon.png, so it has no local copy.
-            [ -f "$SRC/favicon.png" ] && cp "$SRC/favicon.png" "$DEST/" || true
+            # Preview reuses the root favicon via ../favicon.svg, so it has no local copy.
+            [ -f "$SRC/favicon.svg" ] && cp "$SRC/favicon.svg" "$DEST/" || true
             [ -d "$SRC/icons" ] && cp -R "$SRC/icons/." "$DEST/icons/" || true
 
             for f in main core standard-view calendar $EXTRA; do
@@ -108,8 +108,8 @@ jobs:
           # Stamp the commit short-SHA onto local JS/CSS/favicon URLs so each
           # deploy is a cache-miss. Google Fonts URLs are untouched.
           TAG="${GITHUB_SHA::7}"
-          sed -i "s#src=\"main.js\"#src=\"main.js?v=${TAG}\"#; s#href=\"style.css\"#href=\"style.css?v=${TAG}\"#; s#href=\"favicon.png\"#href=\"favicon.png?v=${TAG}\"#" deploy/index.html
-          sed -i "s#src=\"main.js\"#src=\"main.js?v=${TAG}\"#; s#href=\"style.css\"#href=\"style.css?v=${TAG}\"#; s#href=\"../favicon.png\"#href=\"../favicon.png?v=${TAG}\"#" deploy/preview/index.html
+          sed -i "s#src=\"main.js\"#src=\"main.js?v=${TAG}\"#; s#href=\"style.css\"#href=\"style.css?v=${TAG}\"#; s#href=\"favicon.svg\"#href=\"favicon.svg?v=${TAG}\"#" deploy/index.html
+          sed -i "s#src=\"main.js\"#src=\"main.js?v=${TAG}\"#; s#href=\"style.css\"#href=\"style.css?v=${TAG}\"#; s#href=\"../favicon.svg\"#href=\"../favicon.svg?v=${TAG}\"#" deploy/preview/index.html
           grep -H 'main\.js?v=' deploy/index.html deploy/preview/index.html
 
       - uses: actions/configure-pages@v6

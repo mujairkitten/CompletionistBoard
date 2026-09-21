@@ -236,20 +236,16 @@ body.light .topbar-inner > .carotene-wrap {
   align-items: center;
   justify-content: center;
   margin: 0;
-  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line));
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--line));
   border-radius: 14px;
-  background: color-mix(in srgb, var(--accent) 16%, var(--panel-2));
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel-2));
   color: var(--accent2);
-  box-shadow: 0 0 16px rgba(var(--accent-rgb), .14);
+  box-shadow: 0 0 8px rgba(var(--accent-rgb), .07);
 }
 .brand-mark {
   width: 42px;
   height: 42px;
   fill: currentColor;
-  font-family: "Quicksand", sans-serif;
-  font-weight: 800;
-  font-size: 16px;
-  letter-spacing: .02em;
 }
 .sr-only {
   position: absolute;
