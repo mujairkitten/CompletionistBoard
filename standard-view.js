@@ -437,7 +437,10 @@ function myCardHtml(t) {
   const inlineCalHtml = `
     <div class="inline-cal">
       <button class="inline-cal-toggle" id="calbtn-${t.id}" aria-expanded="${openInlineCals.has(t.id) ? 'true' : 'false'}" aria-controls="calbody-${t.id}">
-        <span aria-hidden="true">📅</span> Calendar
+        <svg class="text-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
+          <path d="M3 10H21M8 3V7M16 3V7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg> Calendar
         <span class="cal-trainee-arrow${openInlineCals.has(t.id) ? ' open' : ''}">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>

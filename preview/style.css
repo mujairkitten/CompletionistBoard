@@ -681,6 +681,18 @@ section.block {
   color: var(--ink-dim);
   margin-left: auto;
 }
+/* Inline SVG sized to surrounding text (e.g. calendar glyph in labels). */
+.text-icon {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+}
+/* Toggle-button glyph matches the chevron affordance next to it. */
+.inline-cal-toggle .text-icon {
+  width: 1.5em;
+  height: 1.5em;
+  vertical-align: -0.3em;
+}
 .block-collapse-btn {
   background: none;
   border: none;
