@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Track Record - Track character aptitudes, distances, and trophy ledger for trainees.">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; worker-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://keepandroidopen.org; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; worker-src 'none'">
   <!-- Note: frame-ancestors is ignored in <meta> CSP per spec; hosting must also send it as an HTTP header. -->
   <title>Track Record</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -43,6 +43,11 @@
     </div>
     <div class="topbar-actions">
       <nav class="rail-nav" aria-label="Main navigation">
+        <button class="btn rail-action" id="jump-top-btn" type="button" aria-label="Jump to top" data-tooltip="Jump to top">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 15l6-6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
         <button class="btn rail-action" id="rail-view-btn" type="button" aria-label="Calendar View" data-tooltip="Calendar View">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
             <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
@@ -129,6 +134,11 @@
           <button class="btn small settings-about-btn" id="about-btn">About Track Record</button>
         </div>
       </div>
+      <button class="btn rail-action" id="jump-bottom-btn" type="button" aria-label="Jump to bottom" data-tooltip="Jump to bottom">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
     </div>
     <div class="rail-item-wrap carotene-wrap">
       <button class="btn rail-action" id="carotene-btn" type="button" aria-label="Carotene (coming soon)" data-tooltip="Carotene — coming soon" aria-expanded="false" aria-controls="carotene-panel">
@@ -216,7 +226,7 @@
       <button class="modal-close" id="about-close" aria-label="Close About">✕</button>
     </div>
     <div class="version-badge">
-      <div class="version-item"><span>Version</span><strong>v5.0-rp1</strong></div>
+      <div class="version-item"><span>Version</span><strong>v5.0-rp2</strong></div>
       <span class="version-divider" aria-hidden="true">|</span>
       <div class="version-item"><span>Database</span><strong>v2609a</strong></div>
     </div>
@@ -236,6 +246,8 @@
         <p>Want to return to the stable build? Open the <a href="../">Main version <span>(current version: 4.3.1)</span></a>.</p>
         <p class="about-credit">2026, Mujairkitten · Made with various AI tools · Not affiliated with Cygames.<br>Source code is licensed under GPL-3. Uma icons follow <a href="https://umamusume.com/fan-createdguide">Cygames' Fan Content Guide</a>.</p>
       </div>
+      <div id="kao-banner"></div>
+      <script src="https://keepandroidopen.org/banner.js?id=kao-banner&amp;size=mini"></script>
     </div>
   </div>
 </div>

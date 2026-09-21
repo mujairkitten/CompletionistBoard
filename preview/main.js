@@ -10,6 +10,16 @@ import {
   syncTopbarHeight, wireBackupModal
 } from './settings.js';
 
+function updateJumpButtons() {
+  const top = document.getElementById('jump-top-btn');
+  const bottom = document.getElementById('jump-bottom-btn');
+  if (!top && !bottom) return;
+  const y = window.scrollY || 0;
+  const max = document.documentElement.scrollHeight - window.innerHeight;
+  if (top) top.disabled = y <= 4;
+  if (bottom) bottom.disabled = y >= max - 4;
+}
+
 function renderMainView() {
   const standard = document.getElementById('standard-view');
   const calView = document.getElementById('calendar-view');
@@ -26,6 +36,7 @@ function renderMainView() {
     renderDatabase();
     renderMyList();
   }
+  updateJumpButtons();
 }
 
 function closeCarotenePanel() {
@@ -38,7 +49,7 @@ function closeCarotenePanel() {
 }
 
 async function init() {
-  console.info('[preview] build v5.0-rp1');
+  console.info('[preview] build v5.0-rp2');
   setRenderHandlers({
     mainView: renderMainView,
     myList: () => { if (!state.settings.calendarViewMode) renderMyList(); },
@@ -58,6 +69,7 @@ async function init() {
   window.addEventListener('resize', debounce(() => {
     applyNavbarPosition();
     syncTopbarHeight();
+    updateJumpButtons();
   }, 150));
 
   const aboutOverlay = document.getElementById('about-overlay');
@@ -137,6 +149,25 @@ async function init() {
       document.getElementById('db-grid')?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
     });
   });
+
+  const scrollBehavior = () => (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
+  const jumpTopBtn = document.getElementById('jump-top-btn');
+  const jumpBottomBtn = document.getElementById('jump-bottom-btn');
+  if (jumpTopBtn) jumpTopBtn.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: scrollBehavior() });
+  });
+  if (jumpBottomBtn) jumpBottomBtn.addEventListener('click', () => {
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: scrollBehavior() });
+  });
+  let jumpRaf = 0;
+  window.addEventListener('scroll', () => {
+    if (jumpRaf) return;
+    jumpRaf = requestAnimationFrame(() => { jumpRaf = 0; updateJumpButtons(); });
+  }, { passive: true });
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => updateJumpButtons()).observe(document.body);
+  }
+  updateJumpButtons();
 
   if (trainToggle) trainToggle.addEventListener('change', () => setAllowCustomTrainees(trainToggle.checked));
   if (trophyToggle) trophyToggle.addEventListener('change', () => setAllowCustomTrophies(trophyToggle.checked));
