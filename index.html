@@ -3,15 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Completionist Board - Track character aptitudes, distances, and trophy ledger for trainees.">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; worker-src 'none'">
-  <title>Completionist Board</title>
+  <meta name="description" content="Track Record - Track character aptitudes, distances, and trophy ledger for trainees.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; worker-src 'none'">
+  <!-- Note: the KAO countdown banner is vendored locally (kao-banner.js), so
+       script-src needs no third-party host. frame-ancestors is ignored in
+       <meta> CSP per spec; hosting must also send it as an HTTP header. -->
+  <title>Track Record</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<a class="skip-link" href="#standard-view">Skip to content</a>
 
 <svg class="bg-pattern" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
   <defs>
@@ -31,12 +36,47 @@
 <div class="topbar">
   <div class="wrap topbar-inner">
     <div class="brand">
-      <h1>Completionist Board</h1>
+      <h1>
+        <svg class="brand-mark" viewBox="0 0 120 120" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="17" y="17" width="40" height="40" rx="9" fill="var(--accent)" stroke="var(--accent)" stroke-width="2"/>
+            <path d="M26.5 37l8 8 13-16" class="brand-check" stroke-width="5"/>
+            <rect x="63" y="17" width="40" height="40" rx="9" fill="var(--accent)" stroke="var(--accent)" stroke-width="2"/>
+            <path d="M72.5 37l8 8 13-16" class="brand-check" stroke-width="5"/>
+            <rect x="17" y="63" width="40" height="40" rx="9" fill="var(--accent)" stroke="var(--accent)" stroke-width="2"/>
+            <path d="M26.5 83l8 8 13-16" class="brand-check" stroke-width="5"/>
+            <rect x="63" y="63" width="40" height="40" rx="9" fill="none" stroke="var(--ink-dim)" stroke-width="2"/>
+          </g>
+        </svg>
+        <span class="sr-only">Track Record</span>
+      </h1>
     </div>
     <div class="topbar-actions">
-      <button class="btn" id="backup-btn">Backup</button>
+      <nav class="rail-nav" aria-label="Main navigation">
+        <button class="btn rail-action" id="jump-top-btn" type="button" aria-label="Jump to top" data-tooltip="Jump to top">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 15l6-6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="btn rail-action" id="rail-view-btn" type="button" aria-label="Calendar View" data-tooltip="Calendar View">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
+            <path d="M3 10H21M8 3V7M16 3V7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <button class="btn rail-action" id="backup-btn" type="button" aria-label="Backup" data-tooltip="Backup">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 3v11M8 10l4 4 4-4M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </nav>
       <div class="settings-wrap">
-        <button class="btn icon-btn" id="settings-btn" aria-label="Settings" title="Settings">⚙</button>
+        <button class="btn icon-btn" id="settings-btn" aria-label="Settings" aria-haspopup="dialog" aria-expanded="false" aria-controls="settings-panel">
+          <svg viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.6-.94l-.36-2.54a.5.5 0 0 0-.5-.43h-3.84a.5.5 0 0 0-.5.43l-.36 2.54a7.03 7.03 0 0 0-1.6.94l-2.39-.96a.5.5 0 0 0-.6.22l-1.92 3.32a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.14.24.42.34.66.25l2.39-.96c.5.33 1.04.61 1.6.94l.36 2.54c.05.22.25.38.5.38h3.84c.25 0 .45-.16.5-.38l.36-2.54c.56-.33 1.1-.61 1.6-.94l2.39.96c.24.09.52-.01.66-.25l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58z" stroke-width="1.5"/>
+            <circle cx="12" cy="12" r="3.5" stroke-width="1.8" fill="none"/>
+          </svg>
+        </button>
         <div class="settings-panel" id="settings-panel">
           <div class="settings-group-label">Appearance</div>
           <div class="settings-row settings-row-icons">
@@ -60,12 +100,31 @@
                 <path d="M3 20H21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               </svg>
             </button>
-            <button class="icon-pill-btn" id="cal-enter-btn" aria-label="Open Calendar View" data-tooltip="Open Calendar View">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
-                <path d="M3 10H21" stroke="currentColor" stroke-width="2"/>
-                <path d="M8 3V7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                <path d="M16 3V7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </div>
+          <div class="settings-group-label" style="margin-top:6px;">Navbar position</div>
+          <div class="nav-position-group" role="group" aria-label="Navbar position">
+            <button class="nav-pos-btn" type="button" data-pos="left" aria-label="Place navbar on the left" aria-pressed="false" data-tooltip="Left">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="4" width="18" height="16" rx="2.5" stroke="currentColor" stroke-width="2"/>
+                <rect x="4.5" y="5.5" width="4" height="13" rx="1.5" fill="currentColor"/>
+              </svg>
+            </button>
+            <button class="nav-pos-btn" type="button" data-pos="top" aria-label="Place navbar at the top" aria-pressed="false" data-tooltip="Top">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="4" width="18" height="16" rx="2.5" stroke="currentColor" stroke-width="2"/>
+                <rect x="4.5" y="5.5" width="15" height="4" rx="1.5" fill="currentColor"/>
+              </svg>
+            </button>
+            <button class="nav-pos-btn" type="button" data-pos="right" aria-label="Place navbar on the right" aria-pressed="false" data-tooltip="Right">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="4" width="18" height="16" rx="2.5" stroke="currentColor" stroke-width="2"/>
+                <rect x="15.5" y="5.5" width="4" height="13" rx="1.5" fill="currentColor"/>
+              </svg>
+            </button>
+            <button class="nav-pos-btn" type="button" data-pos="bottom" aria-label="Place navbar at the bottom" aria-pressed="false" data-tooltip="Bottom">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="4" width="18" height="16" rx="2.5" stroke="currentColor" stroke-width="2"/>
+                <rect x="4.5" y="14.5" width="15" height="4" rx="1.5" fill="currentColor"/>
               </svg>
             </button>
           </div>
@@ -73,30 +132,48 @@
           <div class="settings-divider"></div>
           <div class="settings-group-label">Customize</div>
           <div class="settings-row">
-            <span>Custom trainees</span>
-            <label class="switch"><input type="checkbox" id="toggle-custom-trainee"><span class="switch-slider"></span></label>
+            <span id="label-custom-trainee">Custom trainees</span>
+            <label class="switch"><input type="checkbox" id="toggle-custom-trainee" aria-labelledby="label-custom-trainee"><span class="switch-slider"></span></label>
           </div>
           <div class="settings-row">
-            <span>Custom trophies</span>
-            <label class="switch"><input type="checkbox" id="toggle-custom-trophy"><span class="switch-slider"></span></label>
+            <span id="label-custom-trophy">Custom trophies</span>
+            <label class="switch"><input type="checkbox" id="toggle-custom-trophy" aria-labelledby="label-custom-trophy"><span class="switch-slider"></span></label>
           </div>
 
           <div class="settings-divider"></div>
-          <button class="btn small settings-about-btn" id="about-btn">About Completionist Board</button>
+          <button class="btn small settings-about-btn" id="about-btn">About Track Record</button>
         </div>
       </div>
+      <button class="btn rail-action" id="jump-bottom-btn" type="button" aria-label="Jump to bottom" data-tooltip="Jump to bottom">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="rail-item-wrap carotene-wrap">
+      <button class="btn rail-action" id="carotene-btn" type="button" aria-label="Carotene (coming soon)" data-tooltip="Carotene — coming soon" aria-expanded="false" aria-controls="carotene-panel">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <g transform="rotate(45 12 12)">
+            <path d="M12 21C10.5 17 9 13.4 9 10.3C9 7.7 10.3 6.1 12 6.1C13.7 6.1 15 7.7 15 10.3C15 13.4 13.5 17 12 21Z" stroke-width="1.8"/>
+            <path d="M12 6.3C11 4.9 10 4.3 8.6 3.9" stroke-width="1.5"/>
+            <path d="M12 6.1C12 4.7 12 3.7 12 2.9" stroke-width="1.5"/>
+            <path d="M12 6.3C13 4.9 14 4.3 15.4 3.9" stroke-width="1.5"/>
+          </g>
+        </svg>
+      </button>
+      <div class="carotene-panel" id="carotene-panel" aria-hidden="true">Coming Soon</div>
     </div>
   </div>
 </div>
 
 <div class="wrap">
 
-<div id="standard-view">
+<div id="standard-view" tabindex="-1">
   <section class="block">
     <div class="block-head">
-      <h2>Trainee Database <span class="section-count" id="db-count">0/0</span>
-        <button class="block-collapse-btn" id="db-collapse-btn" aria-label="Collapse Trainee Database">
-          <span class="cal-trainee-arrow open">
+      <h2>Trainee Database <span class="section-count" id="db-count">–/–</span>
+        <button class="block-collapse-btn" id="db-collapse-btn" aria-label="Collapse Trainee Database" aria-expanded="true" aria-controls="db-block-body">
+          <span class="cal-trainee-arrow open" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
@@ -107,16 +184,16 @@
     </div>
     <div class="block-body open overflow-visible" id="db-block-body">
       <div class="search-row">
-        <input class="search" id="db-search" type="text" placeholder="Search the database…">
-        <div class="cal-trainee-sort" id="db-sort">
-          <button class="sort-btn active" data-sort="default">Default</button>
-          <button class="sort-btn" data-sort="az">A-Z</button>
-          <button class="sort-btn" data-sort="za">Z-A</button>
+        <input class="search" id="db-search" type="text" placeholder="Search the database…" aria-label="Search the trainee database">
+        <div class="cal-trainee-sort" id="db-sort" role="group" aria-label="Database sort order">
+          <button class="sort-btn active" data-sort="default" aria-pressed="true">Default</button>
+          <button class="sort-btn" data-sort="az" aria-pressed="false">A-Z</button>
+          <button class="sort-btn" data-sort="za" aria-pressed="false">Z-A</button>
         </div>
       </div>
-      <div class="db-pagination" id="db-pagination-top"></div>
+      <nav class="db-pagination" id="db-pagination-top" aria-label="Trainee database pagination (top)"></nav>
       <div class="db-grid" id="db-grid"></div>
-      <div class="db-pagination" id="db-pagination-bottom"></div>
+      <nav class="db-pagination" id="db-pagination-bottom" aria-label="Trainee database pagination (bottom)"></nav>
     </div>
   </section>
 
@@ -124,25 +201,25 @@
 
   <section class="block">
     <div class="block-head">
-      <h2>My List <span class="section-count" id="my-count">0/0</span>
-        <button class="block-collapse-btn" id="my-collapse-btn" aria-label="Collapse My List">
-          <span class="cal-trainee-arrow open">
+      <h2>My List <span class="section-count" id="my-count">–/–</span>
+        <button class="block-collapse-btn" id="my-collapse-btn" aria-label="Collapse My List" aria-expanded="true" aria-controls="my-block-body">
+          <span class="cal-trainee-arrow open" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </span>
         </button>
       </h2>
-      <span class="desc">Track aptitudes and trophies toward Completionist.</span>
+      <span class="desc">Track aptitudes and trophies toward Completionist. Open <span aria-hidden="true">📅</span> Calendar on a card for its race grid.</span>
     </div>
     <div class="block-body open overflow-visible" id="my-block-body">
       <div class="search-row" id="custom-trainee-row">
-        <input type="text" class="search" id="custom-name" placeholder="Add a custom trainee by name…" style="max-width:260px;">
+        <input type="text" class="search" id="custom-name" placeholder="Add a custom trainee by name…" aria-label="Custom trainee name" style="max-width:260px;">
         <button class="btn" id="custom-add-btn">+ Add custom</button>
       </div>
-      <div class="db-pagination" id="my-pagination-top"></div>
+      <nav class="db-pagination" id="my-pagination-top" aria-label="My List pagination (top)"></nav>
       <div class="mylist" id="mylist"></div>
-      <div class="db-pagination" id="my-pagination-bottom"></div>
+      <nav class="db-pagination" id="my-pagination-bottom" aria-label="My List pagination (bottom)"></nav>
       <div class="empty-note" id="mylist-empty" style="display:none;">Your list is empty — add trainees from the database above, or add a custom one.</div>
     </div>
   </section>
@@ -150,54 +227,62 @@
 
 </div>
 
-<div id="calendar-view" style="display:none;"></div>
+<div id="calendar-view" tabindex="-1" style="display:none;"></div>
 
-<div class="modal-overlay" id="about-overlay">
+<div class="modal-overlay" id="about-overlay" role="dialog" aria-modal="true" aria-labelledby="about-title">
   <div class="modal-box about-modal" id="about-modal">
     <div class="modal-head">
-      <span class="modal-title">About the app</span>
-      <button class="modal-close" id="about-close" aria-label="Close">✕</button>
+      <h2 class="modal-title" id="about-title">About the app</h2>
+      <button class="modal-close" id="about-close" aria-label="Close About">✕</button>
     </div>
     <div class="version-badge">
-      <div class="version-item"><span>Version</span><strong>v4.3.1</strong></div>
+      <div class="version-item"><span>Version</span><strong>v5.0</strong></div>
       <span class="version-divider" aria-hidden="true">|</span>
       <div class="version-item"><span>Database</span><strong>v2609a</strong></div>
     </div>
     <div class="about-text">
       <div class="about-section">
         <div class="about-section-label">Data</div>
-        <p>Character aptitudes are consolidated from the Umamusume Wiki trainee tables across all Global costumes.</p>
-        <p>The race calendar includes 152 G1-G3 races. Out-of-Bond is for custom trophies without a fixed date.</p>
+        <p>Character aptitudes are from various sources, including <a href="https://umamusu.wiki/Main_Page" rel="noopener noreferrer">Umamusume Wiki</a> and <a href="https://twitter.com/Umamusume_eng" rel="noopener noreferrer">official Global Twitter account of the game</a>.</p>
+        <p>The race calendar includes 152 G1-G3 races. Out-of-Bond is for custom trophies without a fixed date, or any custom objectives.</p>
+        <p>A trophy is a race on a trainee's list — check it off when completed.</p>
       </div>
       <div class="about-section">
         <div class="about-section-label">Privacy &amp; backup</div>
-        <p>Your list stays private in this browser. Use <strong>Backup</strong> to move it between sessions or devices.</p>
+        <p>Your list stays private in this browser. Use <strong>Backup</strong> function to move it between sessions or devices.</p>
       </div>
       <div class="about-section about-links">
         <div class="about-section-label">More</div>
-        <p>Want to try the alternate build? Open the <a href="preview/">Preview version <span>(current version: 5.0-rp3)</span></a>.</p>
-        <p class="about-credit">2026, Mujairkitten · Made with various AI tools · Not affiliated with Cygames.<br>Source code is licensed under GPL-3. Uma icons follow <a href="https://umamusume.com/fan-createdguide">Cygames' Fan Content Guide</a>.</p>
+        <p>Want to try the alternate build? Open the <a href="preview/">Preview version <span>(current version: 5.0)</span></a>.</p>
+        <p class="about-credit">2026, Mujairkitten · Made with various AI tools · Not affiliated with Cygames.<br>Source code is licensed under GPL-3. Uma icons follow <a href="https://umamusume.com/fan-createdguide" rel="noopener noreferrer">Cygames' Fan Content Guide</a>.</p>
       </div>
+      <div id="kao-banner"></div>
+      <script src="kao-banner.js?id=kao-banner&amp;size=mini"></script>
     </div>
   </div>
 </div>
 
-<div class="modal-overlay" id="backup-overlay">
+<div class="modal-overlay" id="backup-overlay" role="dialog" aria-modal="true" aria-labelledby="backup-title">
   <div class="modal-box" id="backup-modal">
     <div class="modal-head">
-      <span class="modal-title">Backup</span>
-      <button class="modal-close" id="backup-close" aria-label="Close">✕</button>
+      <h2 class="modal-title" id="backup-title">Backup</h2>
+      <button class="modal-close" id="backup-close" aria-label="Close Backup">✕</button>
     </div>
-    <div class="cal-tabs" id="backup-tabs">
-      <button class="cal-tab-btn active" data-tab="export">Export</button>
-      <button class="cal-tab-btn" data-tab="import">Import</button>
+    <div class="cal-tabs" id="backup-tabs" role="tablist" aria-label="Backup mode">
+      <button class="cal-tab-btn active" id="backup-tab-export" data-tab="export" role="tab" aria-selected="true" aria-controls="backup-export-panel">Export</button>
+      <button class="cal-tab-btn" id="backup-tab-import" data-tab="import" role="tab" aria-selected="false" aria-controls="backup-import-panel">Import</button>
     </div>
-    <div id="backup-export-panel">
-      <textarea class="backup-textarea" id="backup-export-text" readonly spellcheck="false"></textarea>
-      <button class="btn small" id="backup-export-file-btn">Export file</button>
+    <div id="backup-export-panel" role="tabpanel" aria-labelledby="backup-tab-export">
+      <textarea class="backup-textarea" id="backup-export-text" readonly spellcheck="false" aria-label="Exported list JSON"></textarea>
+      <div class="backup-export-meta"><span id="backup-export-stamp" aria-live="polite"></span></div>
+      <div class="backup-import-actions">
+        <button class="btn small" id="backup-copy-btn">Copy</button>
+        <button class="btn small" id="backup-export-file-btn">Export file</button>
+      </div>
     </div>
-    <div id="backup-import-panel" style="display:none;">
-      <textarea class="backup-textarea" id="backup-import-text" placeholder="Paste your exported JSON here…" spellcheck="false"></textarea>
+    <div id="backup-import-panel" style="display:none;" role="tabpanel" aria-labelledby="backup-tab-import">
+      <textarea class="backup-textarea" id="backup-import-text" placeholder="Paste your exported JSON here…" spellcheck="false" aria-label="Pasted backup JSON"></textarea>
+      <div class="backup-error" id="backup-import-error" role="alert" hidden></div>
       <div class="backup-import-actions">
         <button class="btn small" id="backup-import-text-btn">Import pasted list</button>
         <label class="btn small" for="backup-import-file">Import from file</label>
@@ -207,7 +292,11 @@
   </div>
 </div>
 
-<div id="tooltip"></div>
+<div id="tooltip" role="tooltip" aria-hidden="true"></div>
+
+<div id="sr-announcer" class="sr-only" aria-live="polite"></div>
+
+<div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
 
 <script type="module" src="main.js"></script>
 </body>

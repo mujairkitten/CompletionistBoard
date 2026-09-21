@@ -3,8 +3,8 @@ import { RACES, TRACK_TO_APT_KEY, DIST_TO_APT_KEY } from '../data/races.js';
 import {
   state, saveState, uid, escapeHtml, escapeAttr, gradeOf, GRADE_INFO, iconHtml, blankIconHtml,
   aptGroupsHtml, wireChips, wireTabArrowNav, sortRowsByMode, raceDateLabel, debounce, tagFgForVar,
-  withFocusKept, showToast,
-  addToMyList, removeFromMyList, toggleTrophy, findRaceByExactName, traineeNameKey
+  withFocusKept, showToast, announce,
+  addToMyList, removeFromMyList, removeTrophy, setTrophyChecked, findRaceByExactName, traineeNameKey
 } from './core.js';
 import {
   closeSettingsPanel,
@@ -85,8 +85,14 @@ function calendarToggleRace(t, race) {
 }
 function addRaceToListUnchecked(t, race) {
   if (trophyForRace(t, race.name)) return;
-  t.trophies.push({ id: uid(), name: race.name, checked: false, grade: race.grade, track: race.track, distance: race.distance, year: race.year, turn: race.turn, month: race.month });
+  const trophy = { id: uid(), name: race.name, checked: false, grade: race.grade, track: race.track, distance: race.distance, year: race.year, turn: race.turn, month: race.month };
+  t.trophies.push(trophy);
   saveState();
+  showToast(`Added ${race.name} to ${t.name}'s list.`, {
+    actionLabel: 'Undo',
+    duration: 8000,
+    onAction: () => removeTrophy(t.id, trophy.id)
+  });
 }
 
 let calViewTab = "Junior";
@@ -188,22 +194,86 @@ export function calPageHtml(t, tab, opts = {}) {
 }
 
 export function wireCalPage(root, t, onChange) {
-  root.querySelectorAll('.cal-tick').forEach(cb => {
+  root.querySelectorAll('.cal-race-row').forEach(row => wireRaceRow(row, t, onChange, root));
+
+  root.querySelectorAll('.cal-cell').forEach(cell => {
+    cell.addEventListener('dragover', (e) => { if (dragCtx) e.preventDefault(); });
+    cell.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (!dragCtx) return;
+      const slotKey = cell.dataset.slot;
+      if (slotKey !== dragCtx.slotKey) return;
+      const yearGroup = cell.dataset.year;
+      const [month, turn] = slotKey.split('|');
+      reorderRaceInSlot(t, slotKey, racesForSlot(yearGroup, month, turn), dragCtx.raceName, null);
+      announce(`Moved ${dragCtx.raceName} in ${slotKey.split('|').join(' ')}.`);
+      onChange();
+    });
+  });
+
+  root.querySelectorAll('.cal-oob-tick').forEach(cb => {
     cb.addEventListener('change', () => {
-      const race = RACES.find(r => r.name === cb.dataset.race);
-      if (race) { calendarToggleRace(t, race); onChange(); }
+      const res = setTrophyChecked(t.id, cb.dataset.tid, cb.checked);
+      if (!res) { onChange(); return; }
+      const row = cb.closest('.trophy-item');
+      if (row) row.classList.toggle('checked', cb.checked);
     });
   });
+}
 
-  root.querySelectorAll('.cal-race-add-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const race = RACES.find(r => r.name === btn.dataset.race);
-      if (race) { addRaceToListUnchecked(t, race); onChange(); }
-    });
+function refreshRaceRow(row, t, race, onChange, root) {
+  const cell = row.closest('.cal-cell');
+  const done = isRaceDone(t, race.name);
+  const tmp = document.createElement('div');
+  tmp.innerHTML = calRaceRowHtml(race, { draggable: !done, checked: done, showAdd: false });
+  const fresh = tmp.firstElementChild;
+  if (!fresh || fresh.nodeType !== 1 || !cell) return;
+  const slotKey = cell.dataset.slot;
+  const yearGroup = cell.dataset.year;
+  const [month, turn] = (slotKey || '|').split('|');
+  if (done) {
+    let div = cell.querySelector('.cal-done-divider');
+    if (!div) {
+      div = document.createElement('div');
+      div.className = 'cal-done-divider';
+      cell.appendChild(div);
+    }
+    div.appendChild(fresh);
+  } else {
+    const names = pendingOrderForSlot(t, slotKey, racesForSlot(yearGroup, month, turn).filter(r => !isRaceDone(t, r.name))).map(r => r.name);
+    const pos = names.indexOf(race.name);
+    const siblings = [...cell.querySelectorAll(':scope > .cal-race-row')];
+    const before = siblings.find(r => names.indexOf(r.dataset.race) > pos);
+    const div = cell.querySelector('.cal-done-divider');
+    if (before) cell.insertBefore(fresh, before);
+    else if (div) cell.insertBefore(fresh, div);
+    else cell.appendChild(fresh);
+    if (div && !div.children.length) div.remove();
+  }
+  row.remove();
+  wireRaceRow(fresh, t, onChange, root);
+  const tick = fresh.querySelector('.cal-tick');
+  if (tick) tick.focus({ preventScroll: true });
+  window.dispatchEvent(new CustomEvent('cb-card-progress', { detail: { id: t.id, race: race.name, checked: done } }));
+}
+
+function wireRaceRow(row, t, onChange, root) {
+  const cb = row.querySelector('.cal-tick');
+  if (cb) cb.addEventListener('change', () => {
+    const race = RACES.find(r => r.name === cb.dataset.race);
+    if (!race) return;
+    calendarToggleRace(t, race);
+    refreshRaceRow(row, t, race, onChange, root);
   });
 
-  root.querySelectorAll('.cal-race-move').forEach(btn => {
+  const addBtn = row.querySelector('.cal-race-add-btn');
+  if (addBtn) addBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const race = RACES.find(r => r.name === addBtn.dataset.race);
+    if (race) { addRaceToListUnchecked(t, race); onChange(); }
+  });
+
+  row.querySelectorAll('.cal-race-move').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const cell = btn.closest('.cal-cell');
@@ -231,7 +301,7 @@ export function wireCalPage(root, t, onChange) {
     });
   });
 
-  root.querySelectorAll('.cal-race-row[draggable="true"]').forEach(row => {
+  if (row.hasAttribute('draggable')) {
     row.addEventListener('dragstart', (e) => {
       if (e.target.closest('input, button')) { e.preventDefault(); return; }
       const cell = row.closest('.cal-cell');
@@ -265,30 +335,10 @@ export function wireCalPage(root, t, onChange) {
       const yearGroup = cell.dataset.year;
       const [month, turn] = slotKey.split('|');
       reorderRaceInSlot(t, slotKey, racesForSlot(yearGroup, month, turn), dragCtx.raceName, row.dataset.race);
+      announce(`Moved ${dragCtx.raceName} in ${slotKey.split('|').join(' ')}.`);
       onChange();
     });
-  });
-
-  root.querySelectorAll('.cal-cell').forEach(cell => {
-    cell.addEventListener('dragover', (e) => { if (dragCtx) e.preventDefault(); });
-    cell.addEventListener('drop', (e) => {
-      e.preventDefault();
-      if (!dragCtx) return;
-      const slotKey = cell.dataset.slot;
-      if (slotKey !== dragCtx.slotKey) return;
-      const yearGroup = cell.dataset.year;
-      const [month, turn] = slotKey.split('|');
-      reorderRaceInSlot(t, slotKey, racesForSlot(yearGroup, month, turn), dragCtx.raceName, null);
-      onChange();
-    });
-  });
-
-  root.querySelectorAll('.cal-oob-tick').forEach(cb => {
-    cb.addEventListener('change', () => {
-      toggleTrophy(t.id, cb.dataset.tid);
-      onChange();
-    });
-  });
+  }
 }
 
 /* ---------- Trainee picker panel ---------- */
@@ -364,7 +414,7 @@ function calSidebarHtml(activeTrainee, isEmpty) {
     <div class="cal-tool-box">
       <h3 class="cal-tool-box-title">Find a race</h3>
       <div class="cal-locate-wrap">
-        <input type="text" class="search" id="cal-locate-input" placeholder="Search races…" autocomplete="off" aria-label="Search races" role="combobox" aria-expanded="false" aria-controls="cal-locate-suggest" aria-autocomplete="list">
+        <input type="text" class="search" id="cal-locate-input" placeholder="Search races…" autocomplete="off" aria-label="Search races" role="combobox" aria-expanded="false" aria-controls="cal-locate-suggest" aria-autocomplete="list" aria-haspopup="listbox">
         <div class="race-suggest" id="cal-locate-suggest" role="listbox" aria-label="Matching races"></div>
       </div>
     </div>
@@ -486,7 +536,7 @@ function wireCalLocate(host, t) {
   input.addEventListener('input', debouncedShow);
   input.addEventListener('focus', showResults);
   input.addEventListener('blur', () => setTimeout(() => setOpen(false), 150));
-  box.addEventListener('mousemove', (e) => {
+  box.addEventListener('mouseover', (e) => {
     const item = e.target.closest('.race-suggest-item');
     if (!item) return;
     setActiveLocateItem(item);

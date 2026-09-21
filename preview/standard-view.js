@@ -260,7 +260,17 @@ export function renderMyList() {
           const v = btn.dataset.tab;
           if (![...CAL_YEAR_GROUPS, 'OoB'].includes(v)) return;
           inlineCalTab[t.id] = v;
-          renderMyList();
+          tabsBox.querySelectorAll('.cal-tab-btn').forEach(b => {
+            const on = b === btn;
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-selected', on ? 'true' : 'false');
+          });
+          const page = document.getElementById(`calpage-${t.id}`);
+          if (page) {
+            page.innerHTML = calPageHtml(t, v, { showAdd: true });
+            page.setAttribute('aria-labelledby', `caltab-${t.id}-${v}`);
+            wireCalPage(page, t, renderMyList);
+          }
         });
       });
     }
@@ -299,6 +309,17 @@ function updateCardProgress(tid) {
   if (fill) fill.style.width = pct + '%';
   if (label) label.textContent = `${done}/${total} · ${pct}%`;
   if (track) track.setAttribute('aria-valuenow', String(pct));
+}
+
+function syncCardTrophy(tid, raceName, checked) {
+  const t = state.myList.find(x => x.id === tid);
+  const tr = t ? t.trophies.find(x => traineeNameKey(x.name) === traineeNameKey(raceName)) : null;
+  if (!t || !tr) return;
+  const cb = document.getElementById(`cb-${tid}-${tr.id}`);
+  if (cb && cb.checked !== checked) cb.checked = checked;
+  const row = cb ? cb.closest('.trophy-item') : null;
+  if (row) row.classList.toggle('checked', checked);
+  updateCardProgress(tid);
 }
 
 function setActiveSuggestItem(box, input, item) {
@@ -448,7 +469,7 @@ function myCardHtml(t) {
       </div>
       <div class="trophy-list">${trophyHtml}</div>
       <div class="add-trophy">
-        <input type="text" id="addt-input-${t.id}" placeholder="Search races…" autocomplete="off" aria-label="Search races to add for ${escapeAttr(t.name)}" role="combobox" aria-expanded="false" aria-controls="addt-suggest-${t.id}" aria-autocomplete="list">
+        <input type="text" id="addt-input-${t.id}" placeholder="Search races…" autocomplete="off" aria-label="Search races to add for ${escapeAttr(t.name)}" role="combobox" aria-expanded="false" aria-controls="addt-suggest-${t.id}" aria-autocomplete="list" aria-haspopup="listbox">
         <button class="btn small" id="addt-btn-${t.id}" aria-label="Add trophy for ${escapeAttr(t.name)}">+ Add</button>
         <div class="race-suggest" id="addt-suggest-${t.id}" role="listbox" aria-label="Matching races"></div>
       </div>
@@ -554,12 +575,21 @@ export function wireStandardViewControls() {
       const tid = input ? input.id.replace('addt-input-', '') : '';
       if (!tid || !input) return;
       const race = findRaceByExactName(item.dataset.race);
-      if (race && addTrophy(tid, race.name, raceMeta(race))) input.value = "";
+      if (race && addTrophy(tid, race.name, raceMeta(race))) {
+        input.value = "";
+        const host = state.myList.find(x => x.id === tid);
+        const added = host ? host.trophies.find(tr => traineeNameKey(tr.name) === traineeNameKey(race.name)) : null;
+        if (added) showToast(`Added ${race.name} to ${host.name}'s list.`, {
+          actionLabel: 'Undo',
+          duration: 8000,
+          onAction: () => removeTrophy(tid, added.id)
+        });
+      }
       hideSuggestBox(item.closest('.race-suggest'));
     };
     wrap.addEventListener('mousedown', pickSuggestItem);
     wrap.addEventListener('click', pickSuggestItem);
-    wrap.addEventListener('mousemove', (e) => {
+    wrap.addEventListener('mouseover', (e) => {
       const item = e.target && e.target.closest ? e.target.closest('.race-suggest-item') : null;
       if (!item || !wrap.contains(item)) return;
       const box = item.closest('.race-suggest');
@@ -572,6 +602,27 @@ export function wireStandardViewControls() {
     window._cbViewTraineeWired = true;
     window.addEventListener('cb-view-trainee', (e) => {
       if (e && e.detail && e.detail.id) goToTrainee(e.detail.id);
+    });
+    window.addEventListener('cb-card-progress', (e) => {
+      const d = e && e.detail;
+      if (!d || !d.id) return;
+      syncCardTrophy(d.id, d.race, d.checked);
+    });
+    // Membership changes patch the DB button + counts without rebuilding the grid.
+    window.addEventListener('cb-db-button', (e) => {
+      const d = e && e.detail;
+      if (!d || !d.name) return;
+      const key = traineeNameKey(d.name);
+      document.getElementById('my-count').textContent = `${state.myList.length}/${DATABASE.length}`;
+      const grid = document.getElementById('db-grid');
+      if (!grid) return;
+      grid.querySelectorAll('[data-add]').forEach(btn => {
+        const idx = Number(btn.dataset.add);
+        if (!Number.isInteger(idx) || idx < 0 || idx >= DATABASE.length) return;
+        if (traineeNameKey(DATABASE[idx].name) !== key) return;
+        btn.disabled = !!d.inList;
+        btn.textContent = d.inList ? '✓ In my list' : '+ Add to my list';
+      });
     });
   }
 

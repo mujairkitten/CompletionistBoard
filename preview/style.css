@@ -131,8 +131,19 @@ body.light .skip-link {
 .cal-tab-btn.active:focus-visible,
 .sort-btn.active:focus-visible,
 .db-pagination .page-number.active:focus-visible,
-.nav-pos-btn.active:focus-visible,
+.nav-pos-btn.active:focus-visible {
+  outline-color: #12141a;
+}
+body.light .cal-tab-btn.active:focus-visible,
+body.light .sort-btn.active:focus-visible,
+body.light .db-pagination .page-number.active:focus-visible,
+body.light .nav-pos-btn.active:focus-visible {
+  outline-color: #fff;
+}
 .skip-link:focus-visible {
+  outline-color: #12141a;
+}
+body.light .skip-link:focus-visible {
   outline-color: #fff;
 }
 :focus-visible {
@@ -153,7 +164,7 @@ body {
 }
 body.nav-top {
   padding-bottom: 0;
-  padding-top: var(--topbar-h, 70px);
+  padding-top: calc(var(--topbar-h, 70px) + env(safe-area-inset-top));
 }
 body.nav-top .topbar {
   top: 0;
@@ -246,6 +257,12 @@ body.light .topbar-inner > .carotene-wrap {
   width: 42px;
   height: 42px;
   fill: currentColor;
+}
+.brand-check {
+  stroke: #12141a;
+}
+body.light .brand-check {
+  stroke: #fff;
 }
 .sr-only {
   position: absolute;
@@ -621,6 +638,10 @@ input[type=file] {
   white-space: nowrap;
   border: 0;
 }
+label.btn:focus-within {
+  outline: 2px solid var(--accent2);
+  outline-offset: 2px;
+}
 section.block {
   margin: 30px 0;
   isolation: isolate;
@@ -978,16 +999,16 @@ body.light .focus-line.clear {
 }
 .trophy-item input[type=checkbox] {
   accent-color: var(--accent);
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
-  margin: 2px;
+  margin: 0;
 }
 /* Only the race-name span (the first direct span sibling) gets the
    completed look. Mini-tags, dates, and icons stay crisp. */
 .trophy-item.checked > span:first-of-type {
   text-decoration: line-through;
-  color: var(--ink-faint);
+  color: var(--ink-dim);
 }
 .trophy-item .rm {
   margin-left: auto;
@@ -1001,7 +1022,8 @@ body.light .focus-line.clear {
   min-width: 24px;
   min-height: 24px;
 }
-.trophy-item .rm:hover {
+.trophy-item .rm:hover,
+.trophy-item .rm:focus-visible {
   color: var(--f-text);
 }
 .add-trophy {
@@ -1119,11 +1141,10 @@ body.light .focus-line.clear {
   align-items: center;
   justify-content: center;
 }
-.db-card .trainee-icon {
-  border-radius: 7px;
-}
-.mycard .trainee-icon {
-  border-radius: 5px;
+.db-card .trainee-icon,
+.mycard .trainee-icon,
+.cal-trainee-card .trainee-icon {
+  border-radius: 8px;
 }
 .trainee-icon img {
   width: 100%;
@@ -1150,6 +1171,7 @@ body.light .focus-line.clear {
   border-radius: 12px;
   padding: 10px 12px;
   width: 220px;
+  max-width: calc(100vw - 32px);
   font-size: 11.5px;
   font-weight: 500;
   line-height: 1.4;
@@ -1196,6 +1218,12 @@ body.light .focus-line.clear {
 }
 body.nav-bottom .toast-region {
   bottom: calc(var(--topbar-h, 70px) + 16px + env(safe-area-inset-bottom));
+}
+body.nav-left .toast-region {
+  left: calc(50% + 39px);
+}
+body.nav-right .toast-region {
+  left: calc(50% - 39px);
 }
 body.light .toast {
   box-shadow: 0 6px 20px rgba(0, 0, 0, .14);
@@ -1283,9 +1311,6 @@ body.light .toast {
   flex-shrink: 0;
   display: flex;
   align-items: flex-start;
-}
-.cal-trainee-card .trainee-icon {
-  border-radius: 7px;
 }
 .cal-trainee-card-right {
   flex: 1;
@@ -1452,8 +1477,8 @@ body.light .toast {
   transition: border-color .12s ease, background .12s ease;
 }
 .cal-cell-empty {
-  background: transparent;
-  border-style: dashed;
+  background: color-mix(in srgb, var(--panel-2) 45%, transparent);
+  border: 1px dashed var(--line);
 }
 .cal-race-row:hover {
   background: rgba(var(--accent-rgb), .08);
@@ -1521,7 +1546,8 @@ body.light .toast {
   justify-content: center;
   cursor: pointer;
 }
-.cal-race-move:hover {
+.cal-race-move:hover,
+.cal-race-move:focus-visible {
   color: var(--accent2);
   border-color: var(--accent-dim);
 }
@@ -1552,10 +1578,10 @@ body.light .cal-race-add-btn:hover {
 }
 .cal-race-row input[type=checkbox] {
   accent-color: var(--accent);
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
-  margin: 2px;
+  margin: 0;
 }
 .cal-grade-tag {
   font-weight: 700;
@@ -1599,7 +1625,7 @@ body.light .cal-race-add-btn:hover {
 }
 .cal-race-row.done .cal-race-name {
   text-decoration: line-through;
-  opacity: .55;
+  color: var(--ink-dim);
 }
 .cal-oob-list {
   display: flex;
@@ -1775,7 +1801,8 @@ body.light .cal-race-add-btn:hover {
   min-height: 24px;
   flex-shrink: 0;
 }
-.cal-trainee-remove:hover {
+.cal-trainee-remove:hover,
+.cal-trainee-remove:focus-visible {
   color: var(--f-text);
 }
 .modal-overlay {
@@ -1862,7 +1889,7 @@ body.light .cal-race-add-btn:hover {
   min-width: 74px;
 }
 .version-item span {
-  color: var(--ink-faint);
+  color: var(--ink-dim);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: .12em;
@@ -1909,6 +1936,19 @@ body.light .cal-race-add-btn:hover {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+.backup-error {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--f-text);
+  background: color-mix(in srgb, var(--f) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--f) 45%, transparent);
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+}
+.backup-error[hidden] {
+  display: none;
 }
 .backup-export-meta {
   font-size: 11px;
@@ -2035,6 +2075,9 @@ body.light .cal-race-add-btn:hover {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     background: var(--faux-glass-bg); 
+  }
+  body.light .mycard, body.light .cal-trainee-card, body.light .cal-tool-box, body.light .modal-box {
+    background: var(--panel);
   }
 }
 @media (min-width: 721px) and (max-width: 1023px) {
@@ -2176,9 +2219,6 @@ body.light .btn:active {
 body.light .btn.ghost {
   box-shadow: none;
   transform: none;
-}
-body.light .icon-btn {
-  padding: 8px 14px;
 }
 body.light .db-card,
 body.light .mycard,

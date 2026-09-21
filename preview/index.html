@@ -4,8 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Track Record - Track character aptitudes, distances, and trophy ledger for trainees.">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://keepandroidopen.org; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; worker-src 'none'">
-  <!-- Note: frame-ancestors is ignored in <meta> CSP per spec; hosting must also send it as an HTTP header. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; worker-src 'none'">
+  <!-- Note: the KAO countdown banner is vendored locally (../kao-banner.js), so
+       script-src needs no third-party host. frame-ancestors is ignored in
+       <meta> CSP per spec; hosting must also send it as an HTTP header. -->
   <title>Track Record</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -38,11 +40,11 @@
         <svg class="brand-mark" viewBox="0 0 120 120" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
           <g fill="none" stroke-linecap="round" stroke-linejoin="round">
             <rect x="17" y="17" width="40" height="40" rx="9" fill="var(--accent)" stroke="var(--accent)" stroke-width="2"/>
-            <path d="M26.5 37l8 8 13-16" stroke="#fff" stroke-width="5"/>
+            <path d="M26.5 37l8 8 13-16" class="brand-check" stroke-width="5"/>
             <rect x="63" y="17" width="40" height="40" rx="9" fill="var(--accent)" stroke="var(--accent)" stroke-width="2"/>
-            <path d="M72.5 37l8 8 13-16" stroke="#fff" stroke-width="5"/>
+            <path d="M72.5 37l8 8 13-16" class="brand-check" stroke-width="5"/>
             <rect x="17" y="63" width="40" height="40" rx="9" fill="var(--accent)" stroke="var(--accent)" stroke-width="2"/>
-            <path d="M26.5 83l8 8 13-16" stroke="#fff" stroke-width="5"/>
+            <path d="M26.5 83l8 8 13-16" class="brand-check" stroke-width="5"/>
             <rect x="63" y="63" width="40" height="40" rx="9" fill="none" stroke="var(--ink-dim)" stroke-width="2"/>
           </g>
         </svg>
@@ -234,28 +236,28 @@
       <button class="modal-close" id="about-close" aria-label="Close About">✕</button>
     </div>
     <div class="version-badge">
-      <div class="version-item"><span>Version</span><strong>v5.0-rp3</strong></div>
+      <div class="version-item"><span>Version</span><strong>v5.0</strong></div>
       <span class="version-divider" aria-hidden="true">|</span>
       <div class="version-item"><span>Database</span><strong>v2609a</strong></div>
     </div>
     <div class="about-text">
       <div class="about-section">
         <div class="about-section-label">Data</div>
-        <p>Character aptitudes are consolidated from the Umamusume Wiki trainee tables across all Global costumes.</p>
-        <p>The race calendar includes 152 G1-G3 races. Out-of-Bond is for custom trophies without a fixed date.</p>
+        <p>Character aptitudes are from various sources, including <a href="https://umamusu.wiki/Main_Page" rel="noopener noreferrer">Umamusume Wiki</a> and <a href="https://twitter.com/Umamusume_eng" rel="noopener noreferrer">official Global Twitter account of the game</a>.</p>
+        <p>The race calendar includes 152 G1-G3 races. Out-of-Bond is for custom trophies without a fixed date, or any custom objectives.</p>
         <p>A trophy is a race on a trainee's list — check it off when completed.</p>
       </div>
       <div class="about-section">
         <div class="about-section-label">Privacy &amp; backup</div>
-        <p>Your list stays private in this browser. Use <strong>Backup</strong> to move it between sessions or devices.</p>
+        <p>Your list stays private in this browser. Use <strong>Backup</strong> function to move it between sessions or devices.</p>
       </div>
       <div class="about-section about-links">
         <div class="about-section-label">More</div>
-        <p>Want to return to the stable build? Open the <a href="../">Main version <span>(current version: 4.3.1)</span></a>.</p>
-        <p class="about-credit">2026, Mujairkitten · Made with various AI tools · Not affiliated with Cygames.<br>Source code is licensed under GPL-3. Uma icons follow <a href="https://umamusume.com/fan-createdguide">Cygames' Fan Content Guide</a>.</p>
+        <p>Want to return to the stable build? Open the <a href="../">Main version <span>(current version: 5.0)</span></a>.</p>
+        <p class="about-credit">2026, Mujairkitten · Made with various AI tools · Not affiliated with Cygames.<br>Source code is licensed under GPL-3. Uma icons follow <a href="https://umamusume.com/fan-createdguide" rel="noopener noreferrer">Cygames' Fan Content Guide</a>.</p>
       </div>
       <div id="kao-banner"></div>
-      <script src="https://keepandroidopen.org/banner.js?id=kao-banner&amp;size=mini"></script>
+      <script src="../kao-banner.js?id=kao-banner&amp;size=mini"></script>
     </div>
   </div>
 </div>
@@ -280,6 +282,7 @@
     </div>
     <div id="backup-import-panel" style="display:none;" role="tabpanel" aria-labelledby="backup-tab-import">
       <textarea class="backup-textarea" id="backup-import-text" placeholder="Paste your exported JSON here…" spellcheck="false" aria-label="Pasted backup JSON"></textarea>
+      <div class="backup-error" id="backup-import-error" role="alert" hidden></div>
       <div class="backup-import-actions">
         <button class="btn small" id="backup-import-text-btn">Import pasted list</button>
         <label class="btn small" for="backup-import-file">Import from file</label>

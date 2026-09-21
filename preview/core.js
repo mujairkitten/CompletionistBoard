@@ -1,5 +1,6 @@
 import { RACES } from '../data/races.js';
-import { renderMyList, renderDatabase } from './render-bus.js';
+import { DATABASE } from '../data/database.js';
+import { renderMyList } from './render-bus.js';
 
 export const GRADES = ["A", "B", "C", "D", "E", "F", "G"];
 export const GRADE_INFO = {
@@ -45,6 +46,8 @@ const MAX_NOTE_LENGTH = 500;
 const MAX_TROPHIES_PER_TRAINEE = 300;
 export const MAX_MY_LIST = 1000;
 export const MAX_IMPORT_TRAINEES = 500;
+export const MAX_IMPORT_TROPHIES = 6000;
+export const MAX_STORED_BYTES = 2 * 1024 * 1024;
 const VALID_CAL_MONTHS = new Set([
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"
@@ -129,7 +132,7 @@ function normalizeTrophy(value, usedIds) {
     name,
     checked: value.checked === true
   };
-  const race = RACES.find(item => item.name.toLowerCase() === name.toLowerCase());
+  const race = RACE_BY_NAME.get(name.toLowerCase());
   if (race) {
     trophy.grade = race.grade;
     trophy.track = race.track;
@@ -225,22 +228,35 @@ function normalizeState(value) {
   const myList = normalizeTraineeList(raw.myList);
   return { myList, settings: normalizeSettings(raw.settings, myList) };
 }
+let storageHealthy = true;
 export async function loadState() {
   let parsed = null;
   try {
     if (window.storage && typeof window.storage.get === 'function') {
       const res = await window.storage.get('mylist', false);
-      if (res && res.value) parsed = JSON.parse(res.value);
+      if (res && res.value) {
+        if (res.value.length > MAX_STORED_BYTES) throw new Error("stored data too large");
+        parsed = JSON.parse(res.value);
+      }
     } else {
       const val = localStorage.getItem('mylist');
-      if (val) parsed = JSON.parse(val);
+      if (val) {
+        if (val.length > MAX_STORED_BYTES) throw new Error("stored data too large");
+        parsed = JSON.parse(val);
+      }
     }
-  } catch (e) { console.error("Storage load failed", e); }
-  state = normalizeState(parsed);
+  } catch (e) {
+    console.error("Storage load failed", e);
+    storageHealthy = false;
+    showToast("Saved data couldn't be read — starting fresh. Export a backup before making changes.", { kind: 'error', duration: 0 });
+  }
+  if (storageHealthy) state = normalizeState(parsed);
 }
 let saveTimer = null;
 let saveFlush = null;
 export function saveState() {
+  // Never autosave over data we failed to load (would destroy it).
+  if (!storageHealthy) return Promise.resolve();
   // Coalesce rapid toggles/drags into one trailing write; snapshot at flush.
   if (!saveFlush) {
     saveFlush = new Promise((resolve) => {
@@ -266,10 +282,10 @@ export function saveState() {
             console.error("Storage save failed", e);
             const isQuota = e && (e.name === 'QuotaExceededError' || e.code === 22);
             const message = isQuota
-              ? "Storage is full — your latest change may not persist. Remove old trainees or export a backup."
+              ? "Storage is full — changes are NOT being saved. Export a backup, then remove old trainees."
               : "Couldn't save your list in this browser.";
             try {
-              window.dispatchEvent(new CustomEvent('cb-toast', { detail: { message, kind: 'error' } }));
+              window.dispatchEvent(new CustomEvent('cb-toast', { detail: { message, kind: 'error', duration: isQuota ? 0 : 5000 } }));
             } catch (_) { /* ignore toast bridge failures */ }
           }
         });
@@ -296,8 +312,11 @@ export function withFocusKept(fn) {
       const host = a.closest ? a.closest('[id]') : null;
       const key = d.page !== undefined && d.page !== ''
         ? `[data-page="${CSS.escape(d.page)}"]`
-        : d.pageAction ? `[data-page-action="${d.pageAction}"]`
-        : (d.move && d.race) ? `.cal-race-move[data-race="${CSS.escape(d.race)}"][data-move="${d.move}"]`
+        : d.pageAction ? `[data-page-action="${CSS.escape(d.pageAction)}"]`
+        : d.switch ? `[data-switch="${CSS.escape(d.switch)}"]`
+        : d.remove ? `[data-remove="${CSS.escape(d.remove)}"]`
+        : d.addswitch ? `[data-addswitch="${CSS.escape(d.addswitch)}"]`
+        : (d.move && d.race) ? `.cal-race-move[data-race="${CSS.escape(d.race)}"][data-move="${CSS.escape(d.move)}"]`
         : null;
       if (host && host.id && key) {
         const hid = host.id;
@@ -501,16 +520,23 @@ export function wireChips(root) {
 export function slugify(name) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
+const KNOWN_ICON_SLUGS = new Set(DATABASE.map(d => slugify(d.name)));
 export function iconHtml(name, size) {
   const slug = slugify(name);
+  const px = Math.min(96, Math.max(16, Number(size) || 32));
   const initial = escapeHtml((name.trim()[0] || '?').toUpperCase());
-  return `<div class="trainee-icon" style="--icon-size:${size}px">
-  <img src="../icons/${slug}.png" alt="" loading="lazy" decoding="async">
-  <span class="icon-fallback">${initial}</span>
+  // Custom names have no icon file — render the fallback directly, no 404.
+  const img = KNOWN_ICON_SLUGS.has(slug)
+    ? `<img src="../icons/${slug}.png" alt="" loading="lazy" decoding="async">`
+    : '';
+  return `<div class="trainee-icon" style="--icon-size:${px}px">
+  ${img}
+  <span class="icon-fallback"${img ? '' : ' style="display:flex"'}>${initial}</span>
 </div>`;
 }
 export function blankIconHtml(size) {
-  return `<div class="trainee-icon trainee-icon-blank" style="--icon-size:${size}px"></div>`;
+  const px = Math.min(96, Math.max(16, Number(size) || 32));
+  return `<div class="trainee-icon trainee-icon-blank" style="--icon-size:${px}px"></div>`;
 }
 export function raceDateLabel(r) {
   const yearLabel = r.year.replace(/,\s*/g, '/');
@@ -539,9 +565,10 @@ export function traineeNameKey(name) {
 }
 
 /* ---------- Race helpers ---------- */
+const RACE_BY_NAME = new Map(RACES.map(r => [(r.name || "").trim().toLowerCase(), r]));
 export function findRaceByExactName(name) {
   const q = (name || "").trim().toLowerCase();
-  return RACES.find(r => r.name.toLowerCase() === q);
+  return RACE_BY_NAME.get(q);
 }
 export function raceMeta(race) {
   return {
@@ -570,7 +597,7 @@ export function addToMyList(name, apt, opts = {}) {
   state.myList.push(trainee);
   saveState();
   renderMyList();
-  renderDatabase();
+  window.dispatchEvent(new CustomEvent('cb-db-button', { detail: { name: canonicalName, inList: true } }));
   if (announce) showToast(`Added ${canonicalName} to My List.`, {
     actionLabel: 'View',
     duration: 8000,
@@ -590,16 +617,20 @@ export function removeFromMyList(id) {
   }
   saveState();
   renderMyList();
-  renderDatabase();
+  window.dispatchEvent(new CustomEvent('cb-db-button', { detail: { name: removed.name, inList: false } }));
   showToast(`Removed ${removed.name}`, {
     actionLabel: 'Undo',
     duration: 8000,
     onAction: () => {
+      if (state.myList.some(t => traineeNameKey(t.name) === traineeNameKey(removed.name))) {
+        showToast(`Couldn't undo — “${removed.name}” is already in My List.`, { kind: 'error' });
+        return;
+      }
       const at = Math.min(index, state.myList.length);
       state.myList.splice(at, 0, removed);
       saveState();
       renderMyList();
-      renderDatabase();
+      window.dispatchEvent(new CustomEvent('cb-db-button', { detail: { name: removed.name, inList: true } }));
     }
   });
 }
@@ -635,15 +666,6 @@ export function setTrophyChecked(tid, trid, checked) {
   return { trainee: t, trophy: tr };
 }
 
-export function toggleTrophy(tid, trid) {
-  const t = state.myList.find(x => x.id === tid);
-  if (!t) return;
-  const tr = t.trophies.find(x => x.id === trid);
-  if (!tr) return;
-  tr.checked = !tr.checked;
-  saveState(); renderMyList();
-}
-
 export function removeTrophy(tid, trid) {
   const t = state.myList.find(x => x.id === tid);
   if (!t) return;
@@ -672,6 +694,11 @@ export function addTrophyFromInput(tid, rawName) {
   const race = findRaceByExactName(name);
   if (!race && !state.settings.allowCustomTrophies) {
     showToast("Custom trophies are disabled in settings.", { kind: 'error' });
+    return false;
+  }
+  const host = state.myList.find(x => x.id === tid);
+  if (host && host.trophies.some(tr => traineeNameKey(tr.name) === traineeNameKey(name))) {
+    showToast(`“${name}” is already in ${host.name}'s list.`);
     return false;
   }
   return addTrophy(tid, name, race ? raceMeta(race) : null);
@@ -707,9 +734,12 @@ export function wireTabArrowNav(container) {
 }
 
 /* ---------- Toast (undo + status) ----------
- * Stacked (max 3); error toasts share one slot so bursts can't pile up
- * or clobber Undo toasts; auto-dismiss waits out :focus-within. */
+ * Stacked; plain toasts cap at MAX_TOASTS while action toasts (Undo/View)
+ * are exempt up to MAX_ACTION_TOASTS so rapid deletes never eat recovery.
+ * Error toasts share one slot so bursts can't pile up or clobber Undo;
+ * auto-dismiss waits out :focus-within; duration<=0 never auto-dismisses. */
 const MAX_TOASTS = 3;
+const MAX_ACTION_TOASTS = 6;
 let errorToast = null;
 function armToastDismiss(el, duration) {
   if (duration <= 0) return null;
@@ -736,6 +766,7 @@ export function showToast(message, opts = {}) {
     document.body.appendChild(region);
   }
   const { actionLabel, onAction, kind = 'info', duration = 5000 } = opts;
+  const hasAction = !!(actionLabel && typeof onAction === 'function');
   if (kind === 'error' && errorToast && errorToast.isConnected) {
     errorToast.querySelector('span').textContent = message;
     if (errorToast._timer) clearTimeout(errorToast._timer);
@@ -743,10 +774,13 @@ export function showToast(message, opts = {}) {
     errorToast._timer = armToastDismiss(errorToast, duration);
     return errorToast;
   }
-  while (region.children.length >= MAX_TOASTS) region.firstChild.remove();
+  while (region.children.length >= (hasAction ? MAX_ACTION_TOASTS : MAX_TOASTS)) {
+    const plain = [...region.children].find(c => !c.querySelector('button'));
+    (plain || region.firstChild).remove();
+  }
   const el = document.createElement('div');
   el.className = 'toast';
-  el.setAttribute('role', 'status');
+  // No role=status here: the region itself is the single live source.
   const text = document.createElement('span');
   text.textContent = message;
   el.appendChild(text);
@@ -774,7 +808,7 @@ export function showToast(message, opts = {}) {
 
 window.addEventListener('cb-toast', (e) => {
   const detail = e && e.detail ? e.detail : {};
-  showToast(detail.message || 'Something happened.', { kind: detail.kind || 'info' });
+  showToast(detail.message || 'Something happened.', { kind: detail.kind || 'info', duration: detail.duration ?? 5000 });
 });
 
 /* Polite one-shot announcements for silent visual toggles (no toast spam). */

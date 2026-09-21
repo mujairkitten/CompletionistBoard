@@ -1,192 +1,61 @@
-import { state, loadState, saveState, debounce, wireChips } from './core.js';
-import { renderDatabase, renderMyList, addCustom, wireStandardViewControls, exportList, importList, importListFromText } from './standard-view.js';
+import { state, loadState, debounce, wireChips } from './core.js';
+import { setRenderHandlers } from './render-bus.js';
+import { renderDatabase, renderMyList, wireStandardViewControls } from './standard-view.js';
 import { renderCalendarView, closeCalTraineePanel } from './calendar.js';
+import {
+  applySettingsUI, closeSettingsPanel, toggleSettingsPanel,
+  openAboutModal, closeAboutModal, openBackupModal, closeBackupModal,
+  toggleMode, toggleColorTheme, setAllowCustomTrainees, setAllowCustomTrophies,
+  setCalendarViewMode, setNavbarPosition, applyNavbarPosition,
+  syncTopbarHeight, wireBackupModal
+} from './settings.js';
 
-export function renderMainView() {
+function updateJumpButtons() {
+  const top = document.getElementById('jump-top-btn');
+  const bottom = document.getElementById('jump-bottom-btn');
+  if (!top && !bottom) return;
+  const y = window.scrollY || 0;
+  const max = document.documentElement.scrollHeight - window.innerHeight;
+  if (top) top.disabled = y <= 4;
+  if (bottom) bottom.disabled = y >= max - 4;
+}
+
+function renderMainView() {
   const standard = document.getElementById('standard-view');
   const calView = document.getElementById('calendar-view');
+  const skip = document.querySelector('.skip-link');
   if (state.settings.calendarViewMode) {
     if (standard) standard.style.display = 'none';
     if (calView) calView.style.display = '';
+    if (skip) skip.setAttribute('href', '#calendar-view');
     renderCalendarView();
   } else {
     if (standard) standard.style.display = '';
     if (calView) calView.style.display = 'none';
+    if (skip) skip.setAttribute('href', '#standard-view');
     renderDatabase();
     renderMyList();
   }
+  updateJumpButtons();
 }
 
-export function applySettingsUI() {
-  const trainToggle = document.getElementById('toggle-custom-trainee');
-  const trophyToggle = document.getElementById('toggle-custom-trophy');
-  const trainRow = document.getElementById('custom-trainee-row');
-  const settingsBtn = document.getElementById('settings-btn');
-  const backupBtn = document.getElementById('backup-btn');
-
-  document.body.classList.toggle('light', !!state.settings.lightMode);
-  document.body.classList.toggle('dirt', state.settings.colorTheme === 'dirt');
-
-  if (trainToggle) trainToggle.checked = !!state.settings.allowCustomTrainees;
-  if (trophyToggle) trophyToggle.checked = !!state.settings.allowCustomTrophies;
-
-  if (trainRow) {
-    trainRow.style.display = state.settings.allowCustomTrainees ? '' : 'none';
-  }
-
-  if (settingsBtn) settingsBtn.style.display = '';
-  if (backupBtn) backupBtn.style.display = '';
-}
-
-export function closeSettingsPanel() {
-  const panel = document.getElementById('settings-panel');
-  if (panel) panel.classList.remove('show');
-}
-
-export function openAboutModal() {
-  closeSettingsPanel();
-  closeCalTraineePanel();
-  const aboutOverlay = document.getElementById('about-overlay');
-  if (aboutOverlay) aboutOverlay.classList.add('show');
-}
-
-function refreshBackupExportText() {
-  const textarea = document.getElementById('backup-export-text');
-  if (textarea) textarea.value = JSON.stringify(state, null, 2);
-}
-
-export function openBackupModal() {
-  closeSettingsPanel();
-  closeCalTraineePanel();
-  const backupOverlay = document.getElementById('backup-overlay');
-  const exportPanel = document.getElementById('backup-export-panel');
-  const importPanel = document.getElementById('backup-import-panel');
-  const tabs = document.querySelectorAll('#backup-tabs .cal-tab-btn');
-  tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === 'export'));
-  if (exportPanel) exportPanel.style.display = '';
-  if (importPanel) importPanel.style.display = 'none';
-  refreshBackupExportText();
-  if (backupOverlay) backupOverlay.classList.add('show');
-}
-
-function closeBackupModal() {
-  const backupOverlay = document.getElementById('backup-overlay');
-  if (backupOverlay) backupOverlay.classList.remove('show');
-}
-
-export function toggleMode() {
-  state.settings.lightMode = !state.settings.lightMode;
-  saveState(); applySettingsUI();
-}
-export function toggleColorTheme() {
-  state.settings.colorTheme = state.settings.colorTheme === 'dirt' ? 'turf' : 'dirt';
-  saveState(); applySettingsUI();
-}
-export function setAllowCustomTrainees(value) {
-  state.settings.allowCustomTrainees = value;
-  saveState(); applySettingsUI();
-}
-export function setAllowCustomTrophies(value) {
-  state.settings.allowCustomTrophies = value;
-  saveState(); applySettingsUI(); renderMainView();
-}
-export function setCalendarViewMode(value) {
-  state.settings.calendarViewMode = value;
-  saveState(); applySettingsUI(); renderMainView();
-  closeSettingsPanel();
-}
-
-let exportCooldownUntil = 0;
-let exportCooldownInterval = null;
-
-function updateExportButtonState() {
-  const btn = document.getElementById('backup-export-file-btn');
-  if (!btn) return;
-  const remaining = Math.ceil((exportCooldownUntil - Date.now()) / 1000);
-  if (remaining > 0) {
-    btn.disabled = true;
-    btn.textContent = `Export file (${remaining}s)`;
-  } else {
-    btn.disabled = false;
-    btn.textContent = 'Export file';
-  }
-}
-
-function startExportCooldown() {
-  exportCooldownUntil = Date.now() + 10000;
-  updateExportButtonState();
-  if (exportCooldownInterval) clearInterval(exportCooldownInterval);
-  exportCooldownInterval = setInterval(() => {
-    updateExportButtonState();
-    if (Date.now() >= exportCooldownUntil) {
-      clearInterval(exportCooldownInterval);
-      exportCooldownInterval = null;
-    }
-  }, 500);
-}
-
-function wireBackupModal() {
-  const backupOverlay = document.getElementById('backup-overlay');
-  const backupClose = document.getElementById('backup-close');
-  const tabs = document.querySelectorAll('#backup-tabs .cal-tab-btn');
-  const exportPanel = document.getElementById('backup-export-panel');
-  const importPanel = document.getElementById('backup-import-panel');
-  const exportFileBtn = document.getElementById('backup-export-file-btn');
-  const importTextBtn = document.getElementById('backup-import-text-btn');
-  const importTextarea = document.getElementById('backup-import-text');
-  const importFileInput = document.getElementById('backup-import-file');
-
-  if (backupOverlay) {
-    backupOverlay.addEventListener('click', (e) => {
-      if (e.target === backupOverlay) closeBackupModal();
-    });
-  }
-  if (backupClose) backupClose.addEventListener('click', closeBackupModal);
-
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      tabs.forEach(t => t.classList.toggle('active', t === tab));
-      const isExport = tab.dataset.tab === 'export';
-      if (exportPanel) exportPanel.style.display = isExport ? '' : 'none';
-      if (importPanel) importPanel.style.display = isExport ? 'none' : '';
-      if (isExport) refreshBackupExportText();
-    });
-  });
-
-  if (exportFileBtn) exportFileBtn.addEventListener('click', () => {
-    if (Date.now() < exportCooldownUntil) return;
-    exportList();
-    startExportCooldown();
-  });
-
-  if (importTextBtn) importTextBtn.addEventListener('click', () => {
-    if (!importTextarea) return;
-    const text = importTextarea.value.trim();
-    if (!text) return;
-    if (importListFromText(text)) importTextarea.value = '';
-  });
-
-  if (importFileInput) importFileInput.addEventListener('change', e => {
-    if (e.target.files[0]) importList(e.target.files[0]);
-    e.target.value = '';
-  });
-}
-
-function syncTopbarHeight() {
-  const topbar = document.querySelector('.topbar');
-  if (!topbar) return;
-  const height = topbar.getBoundingClientRect().height;
-  document.documentElement.style.setProperty('--topbar-h', `${height}px`);
+function closeCarotenePanel() {
+  const panel = document.getElementById('carotene-panel');
+  const btn = document.getElementById('carotene-btn');
+  if (!panel || !panel.classList.contains('open')) return;
+  panel.classList.remove('open');
+  panel.setAttribute('aria-hidden', 'true');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
 }
 
 async function init() {
-  // Guard against double evaluation: the deploy stamps ?v= onto the entry
-  // script, but standard-view.js imports bare './main.js'. Query strings are
-  // part of module identity, so browsers evaluate both URLs as separate
-  // module instances — running init twice, attaching every listener twice,
-  // and making each toggle cancel itself. First instance wins.
-  if (window.__cbMainInitDone) return;
-  window.__cbMainInitDone = true;
+  console.info('build v5.0');
+  setRenderHandlers({
+    mainView: renderMainView,
+    myList: () => { if (!state.settings.calendarViewMode) renderMyList(); },
+    database: () => { if (!state.settings.calendarViewMode) renderDatabase(); },
+  });
+
   await loadState();
   applySettingsUI();
   renderMainView();
@@ -194,27 +63,29 @@ async function init() {
   wireStandardViewControls();
   wireBackupModal();
   syncTopbarHeight();
-  window.addEventListener('resize', debounce(syncTopbarHeight, 150));
+  if (document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function') {
+    document.fonts.ready.then(() => syncTopbarHeight());
+  }
+  window.addEventListener('resize', debounce(() => {
+    applyNavbarPosition();
+    syncTopbarHeight();
+    updateJumpButtons();
+  }, 150));
 
-  const aboutBtn = document.getElementById('about-btn');
   const aboutOverlay = document.getElementById('about-overlay');
   const aboutClose = document.getElementById('about-close');
+  const aboutBtn = document.getElementById('about-btn');
   if (aboutBtn) aboutBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    closeCalTraineePanel();
     openAboutModal();
   });
   if (aboutOverlay) {
     aboutOverlay.addEventListener('click', (e) => {
-      if (e.target === aboutOverlay) aboutOverlay.classList.remove('show');
+      if (e.target === aboutOverlay) closeAboutModal();
     });
   }
-  if (aboutClose) aboutClose.addEventListener('click', () => aboutOverlay.classList.remove('show'));
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      if (aboutOverlay) aboutOverlay.classList.remove('show');
-      closeBackupModal();
-    }
-  });
+  if (aboutClose) aboutClose.addEventListener('click', closeAboutModal);
 
   const settingsBtn = document.getElementById('settings-btn');
   const settingsPanel = document.getElementById('settings-panel');
@@ -222,36 +93,107 @@ async function init() {
     settingsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       closeCalTraineePanel();
-      settingsPanel.classList.toggle('show');
+      closeCarotenePanel();
+      toggleSettingsPanel();
     });
-    settingsPanel.addEventListener('click', e => e.stopPropagation());
+
+    // Settings-panel-scoped click handler: keeps clicks inside the panel
+    // from closing it, AND routes nav-position button clicks. The old
+    // document-level delegation never fired because stopPropagation()
+    // killed the event before it reached document.
+    settingsPanel.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const navBtn = e.target.closest('.nav-pos-btn');
+      if (navBtn && !navBtn.disabled) {
+        setNavbarPosition(navBtn.dataset.pos);
+      }
+    });
+
     wireChips(settingsPanel);
   }
 
   const backupBtn = document.getElementById('backup-btn');
   if (backupBtn) backupBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    closeCalTraineePanel();
     openBackupModal();
   });
 
   const modeToggleBtn = document.getElementById('mode-toggle-btn');
   const themeToggleBtn = document.getElementById('theme-toggle-btn');
-  const calEnterBtn = document.getElementById('cal-enter-btn');
+  const caroteneBtn = document.getElementById('carotene-btn');
+  const railViewBtn = document.getElementById('rail-view-btn');
   const trainToggle = document.getElementById('toggle-custom-trainee');
   const trophyToggle = document.getElementById('toggle-custom-trophy');
 
   if (modeToggleBtn) modeToggleBtn.addEventListener('click', toggleMode);
   if (themeToggleBtn) themeToggleBtn.addEventListener('click', toggleColorTheme);
-  if (calEnterBtn) calEnterBtn.addEventListener('click', (e) => {
+
+  if (caroteneBtn) caroteneBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    setCalendarViewMode(true);
+    const panel = document.getElementById('carotene-panel');
+    if (!panel) return;
+    const isOpen = panel.classList.toggle('open');
+    panel.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+    caroteneBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    if (isOpen) closeSettingsPanel();
   });
+  if (caroteneBtn) caroteneBtn.setAttribute('aria-expanded', 'false');
+
+  if (railViewBtn) railViewBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const showCalendar = !state.settings.calendarViewMode;
+    setCalendarViewMode(showCalendar);
+    if (!showCalendar) requestAnimationFrame(() => {
+      const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      document.getElementById('db-grid')?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+    });
+  });
+
+  const scrollBehavior = () => (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
+  const jumpTopBtn = document.getElementById('jump-top-btn');
+  const jumpBottomBtn = document.getElementById('jump-bottom-btn');
+  if (jumpTopBtn) jumpTopBtn.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: scrollBehavior() });
+  });
+  if (jumpBottomBtn) jumpBottomBtn.addEventListener('click', () => {
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: scrollBehavior() });
+  });
+  let jumpRaf = 0;
+  window.addEventListener('scroll', () => {
+    if (jumpRaf) return;
+    jumpRaf = requestAnimationFrame(() => { jumpRaf = 0; updateJumpButtons(); });
+  }, { passive: true });
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => updateJumpButtons()).observe(document.body);
+  }
+  updateJumpButtons();
+
   if (trainToggle) trainToggle.addEventListener('change', () => setAllowCustomTrainees(trainToggle.checked));
   if (trophyToggle) trophyToggle.addEventListener('change', () => setAllowCustomTrophies(trophyToggle.checked));
 
-  document.addEventListener('click', () => {
+  document.addEventListener('click', (e) => {
+    const panel = document.getElementById('carotene-panel');
+    const btn = document.getElementById('carotene-btn');
+    if (panel && btn) {
+      const target = e.target;
+      if (!panel.contains(target) && !btn.contains(target) && panel.classList.contains('open')) {
+        panel.classList.remove('open');
+        panel.setAttribute('aria-hidden', 'true');
+        btn.setAttribute('aria-expanded', 'false');
+      }
+    }
     closeSettingsPanel();
     closeCalTraineePanel();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    closeCarotenePanel();
+    closeAboutModal();
+    closeBackupModal();
+    closeSettingsPanel();
+    if (closeCalTraineePanel()) document.getElementById('cal-trainee-btn')?.focus();
   });
 }
 init();

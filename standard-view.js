@@ -1,43 +1,51 @@
 import { DATABASE } from './data/database.js';
 import { RACES, TRACK_TO_APT_KEY, DIST_TO_APT_KEY } from './data/races.js';
 import {
-  state, saveState, uid, escapeHtml, gradeOf, GRADE_INFO, normalizeImportedTrainees,
-  aptGroupsHtml, wireChips, iconHtml, weakAptitudes, sortRowsByMode, raceDateLabel, debounce
+  state, escapeHtml, escapeAttr, gradeOf, GRADE_INFO,
+  aptGroupsHtml, wireChips, wireTabArrowNav, tagFgForVar, iconHtml, weakAptitudes, sortRowsByMode, raceDateLabel, debounce,
+  withFocusKept, setTrophyChecked, showToast,
+  traineeNameKey, findRaceByExactName, raceMeta,
+  addToMyList, removeFromMyList, addTrophy, removeTrophy, addTrophyFromInput
 } from './core.js';
-import { calPageHtml, wireCalPage, calGradeColor, CAL_YEAR_GROUPS } from './calendar.js';
-import { renderMainView } from './main.js';
+import { calPageHtml, wireCalPage, calGradeColor, calGradeFg, CAL_YEAR_GROUPS } from './calendar.js';
+import { openBackupModal } from './settings.js';
 
-export let dbSort = "default";
-export const DB_PAGE_SIZE = 30;
+let dbSort = "default";
+const DB_PAGE_SIZE = 30;
 let dbPage = 1;
-export const MY_PAGE_SIZE = 5;
+const MY_PAGE_SIZE = 5;
 let myPage = 1;
 
 const openInlineCals = new Set();
 const inlineCalTab = {};
 
-function traineeNameKey(name) {
-  return (name || "")
-    .normalize('NFKC')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .toLocaleLowerCase();
-}
-
-let dbGridActionsWired = false;
+const dbGridWired = new WeakSet();
 function wireDbGridActions(grid) {
-  if (dbGridActionsWired) return;
-  dbGridActionsWired = true;
+  if (dbGridWired.has(grid)) return;
+  dbGridWired.add(grid);
   grid.addEventListener('click', (e) => {
+    const clearBtn = e.target.closest('[data-clear-search]');
+    if (clearBtn) {
+      const search = document.getElementById('db-search');
+      if (search) search.value = '';
+      dbPage = 1;
+      renderDatabase();
+      document.getElementById('db-search')?.focus();
+      return;
+    }
     const btn = e.target.closest('[data-add]');
     if (!btn || btn.disabled) return;
-    const d = DATABASE[parseInt(btn.dataset.add, 10)];
+    const idx = Number(btn.dataset.add);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= DATABASE.length) return;
+    const d = DATABASE[idx];
     addToMyList(d.name, JSON.parse(JSON.stringify(d.apt)));
   });
 }
 
 export function renderDatabase() {
+  withFocusKept(() => {
   const grid = document.getElementById('db-grid');
+  if (!grid) return;
   const filter = document.getElementById('db-search').value.trim().toLowerCase();
   const list = sortRowsByMode(DATABASE.filter(d => d.name.toLowerCase().includes(filter)), dbSort);
   document.getElementById('db-count').textContent = `${list.length}/${DATABASE.length}`;
@@ -47,12 +55,15 @@ export function renderDatabase() {
   if (dbPage < 1) dbPage = 1;
   const pageList = list.slice((dbPage - 1) * DB_PAGE_SIZE, dbPage * DB_PAGE_SIZE);
 
-  const addedNames = new Set(state.myList.map(t => t.name.toLowerCase()));
+  const addedNames = new Set(state.myList.map(t => traineeNameKey(t.name)));
   const indexByName = new Map(DATABASE.map((d, i) => [d.name, i]));
 
+  if (pageList.length === 0) {
+    grid.innerHTML = `<div class="empty-note">No trainees match “${escapeHtml(document.getElementById('db-search').value.trim())}”. <button class="btn small" data-clear-search>Clear search</button></div>`;
+  } else {
   grid.innerHTML = pageList.map((d) => {
     const realIndex = indexByName.get(d.name);
-    const already = addedNames.has(d.name.toLowerCase());
+    const already = addedNames.has(traineeNameKey(d.name));
     return `
     <div class="db-card">
       ${filter ? '' : `<span class="db-num">${String(realIndex + 1).padStart(2, '0')}</span>`}
@@ -61,63 +72,101 @@ export function renderDatabase() {
         <div class="db-name">${escapeHtml(d.name)}</div>
       </div>
       ${aptGroupsHtml(d.apt)}
-      <button class="btn small add-btn" data-add="${realIndex}" ${already ? 'disabled' : ''}>${already ? '✓ In my list' : '+ Add to my list'}</button>
+      <button class="btn small add-btn" data-add="${realIndex}" aria-label="Add ${escapeAttr(d.name)} to my list" ${already ? 'disabled' : ''}>${already ? '✓ In my list' : '+ Add to my list'}</button>
     </div>`;
   }).join("");
+  }
 
   wireChips(grid);
   wireDbGridActions(grid);
-  renderPagination('db-pagination-top', 'db-pagination-bottom', dbPage, totalPages, (nextPage) => {
+  renderPagination('db-pagination-top', 'db-pagination-bottom', dbPage, totalPages, 'Trainee database', (nextPage) => {
     dbPage = nextPage;
     renderDatabase();
+    scrollPagerIntoView('db-pagination-top');
+  });
   });
 }
 
-function renderPagination(topId, bottomId, page, totalPages, onGoToPage) {
+function reducedMotion() {
+  return typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function scrollPagerIntoView(topId) {
+  const el = document.getElementById(topId);
+  if (el) el.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
+}
+
+function pageWindow(current, total) {
+  const pages = new Set([1, total, current, current - 1, current + 1, current - 2, current + 2]);
+  const list = [...pages].filter(p => p >= 1 && p <= total).sort((a, b) => a - b);
+  const out = [];
+  let prev = 0;
+  for (const p of list) {
+    if (prev && p - prev > 1) out.push('…');
+    out.push(p);
+    prev = p;
+  }
+  return out;
+}
+
+function renderPagination(topId, bottomId, page, totalPages, pagerName, onGoToPage) {
+  if (typeof pagerName === 'function') {
+    onGoToPage = pagerName;
+    pagerName = 'Pages';
+  }
   [topId, bottomId].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
+    if (!el.dataset.pagerWired) {
+      el.dataset.pagerWired = 'true';
+      el.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-page-action], [data-page]');
+        if (!btn || btn.disabled) return;
+        const go = el._goToPage;
+        if (typeof go !== 'function') return;
+        const cur = el._page;
+        const next = btn.dataset.page !== undefined && btn.dataset.page !== ''
+          ? Number(btn.dataset.page)
+          : cur + (btn.dataset.pageAction === 'next' ? 1 : -1);
+        go(next);
+      });
+    }
+    el._goToPage = onGoToPage;
+    el._page = page;
     if (totalPages <= 1) { el.innerHTML = ""; return; }
-    const pageButtons = Array.from({ length: totalPages }, (_, index) => {
-      const pageNumber = index + 1;
-      return `<button class="btn small page-number${pageNumber === page ? ' active' : ''}" data-page="${pageNumber}" aria-label="Go to page ${pageNumber}" ${pageNumber === page ? 'aria-current="page"' : ''}>${pageNumber}</button>`;
+    const pageButtons = pageWindow(page, totalPages).map(item => {
+      if (item === '…') return `<span class="db-page-ellipsis" aria-hidden="true">…</span>`;
+      const isCurrent = item === page;
+      return `<button class="btn small page-number${isCurrent ? ' active' : ''}" data-page="${item}" aria-label="Go to page ${item} of ${pagerName}" ${isCurrent ? 'aria-current="page"' : ''}>${item}</button>`;
     }).join('');
     el.innerHTML = `
-      <button class="btn small page-arrow" data-page-action="prev" aria-label="Previous page" title="Previous page" ${page <= 1 ? 'disabled' : ''}>‹</button>
+      <button class="btn small page-arrow" data-page-action="prev" aria-label="Previous page of ${pagerName}" ${page <= 1 ? 'disabled' : ''}>‹</button>
       <span class="db-page-numbers">${pageButtons}</span>
-      <button class="btn small page-arrow" data-page-action="next" aria-label="Next page" title="Next page" ${page >= totalPages ? 'disabled' : ''}>›</button>
+      <button class="btn small page-arrow" data-page-action="next" aria-label="Next page of ${pagerName}" ${page >= totalPages ? 'disabled' : ''}>›</button>
     `;
-    el.querySelectorAll('[data-page-action], [data-page]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const nextPage = btn.dataset.page
-          ? Number(btn.dataset.page)
-          : page + (btn.dataset.pageAction === 'next' ? 1 : -1);
-        onGoToPage(nextPage);
-      });
-    });
   });
 }
 
-export function addToMyList(name, apt) {
-  const normalizedName = traineeNameKey(name);
-  if (!normalizedName) return;
-  if (state.myList.some(t => traineeNameKey(t.name) === normalizedName)) return;
-  const canonicalName = name.normalize('NFKC').trim().replace(/\s+/g, ' ');
-  state.myList.push({ id: uid(), name: canonicalName, aptitudes: apt, trophies: [] });
-  saveState();
-  renderMyList();
-  renderDatabase();
-}
-
 export function renderMyList() {
+  withFocusKept(() => {
   const wrap = document.getElementById('mylist');
+  if (!wrap) return;
   const emptyEl = document.getElementById('mylist-empty');
   document.getElementById('my-count').textContent = `${state.myList.length}/${DATABASE.length}`;
 
+  const liveIds = new Set(state.myList.map(t => t.id));
+  for (const id of [...openInlineCals]) if (!liveIds.has(id)) openInlineCals.delete(id);
+  for (const id of Object.keys(inlineCalTab)) if (!liveIds.has(id)) delete inlineCalTab[id];
+
   if (state.myList.length === 0) {
     emptyEl.style.display = "block";
+    emptyEl.innerHTML = state.settings.allowCustomTrainees
+      ? `Your list is empty — add trainees from the database above, or add a custom one. <button class="btn small" id="empty-import-btn">Import backup</button>`
+      : `Your list is empty — add trainees from the database above. <button class="btn small" id="empty-import-btn">Import backup</button>`;
+    const importBtn = document.getElementById('empty-import-btn');
+    if (importBtn) importBtn.addEventListener('click', openBackupModal);
     wrap.innerHTML = "";
-    renderPagination('my-pagination-top', 'my-pagination-bottom', 1, 1, () => {});
+    renderPagination('my-pagination-top', 'my-pagination-bottom', 1, 1, 'My List', () => {});
     return;
   }
   emptyEl.style.display = "none";
@@ -139,23 +188,39 @@ export function renderMyList() {
     const suggestBox = document.getElementById(`addt-suggest-${t.id}`);
 
     if (addTBtn) addTBtn.addEventListener('click', () => {
-      addTrophyFromInput(t.id, addTInput.value);
-      addTInput.value = "";
+      if (addTrophyFromInput(t.id, addTInput.value)) addTInput.value = "";
       hideSuggestBox(suggestBox);
     });
     if (addTInput) {
       addTInput.addEventListener('keydown', e => {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          const items = suggestBox ? [...suggestBox.querySelectorAll('.race-suggest-item')] : [];
+          if (items.length === 0) return;
+          e.preventDefault();
+          const active = suggestBox.querySelector('.race-suggest-item.active');
+          let idx = items.indexOf(active);
+          idx = e.key === 'ArrowDown'
+            ? (idx + 1) % items.length
+            : (idx - 1 + items.length) % items.length;
+          setActiveSuggestItem(suggestBox, addTInput, items[idx]);
+          items[idx].scrollIntoView({ block: 'nearest' });
+          return;
+        }
         if (e.key === 'Enter') {
-          addTrophyFromInput(t.id, addTInput.value);
-          addTInput.value = "";
+          const active = suggestBox ? suggestBox.querySelector('.race-suggest-item.active') : null;
+          const raw = active ? active.dataset.race : addTInput.value;
+          if (addTrophyFromInput(t.id, raw)) addTInput.value = "";
           hideSuggestBox(suggestBox);
+          addTInput.setAttribute('aria-expanded', 'false');
         } else if (e.key === 'Escape') {
           hideSuggestBox(suggestBox);
+          addTInput.setAttribute('aria-expanded', 'false');
         }
       });
-      addTInput.addEventListener('input', () => {
+      const debouncedSuggest = debounce(() => {
         renderRaceSuggestions(t, addTInput.value, suggestBox, addTInput);
-      });
+      }, 120);
+      addTInput.addEventListener('input', debouncedSuggest);
       addTInput.addEventListener('focus', () => {
         renderRaceSuggestions(t, addTInput.value, suggestBox, addTInput);
       });
@@ -166,7 +231,13 @@ export function renderMyList() {
 
     t.trophies.forEach(tr => {
       const cb = document.getElementById(`cb-${t.id}-${tr.id}`);
-      if (cb) cb.addEventListener('change', () => toggleTrophy(t.id, tr.id));
+      if (cb) cb.addEventListener('change', () => {
+        const res = setTrophyChecked(t.id, tr.id, cb.checked);
+        if (!res) { renderMyList(); return; }
+        const row = cb.closest('.trophy-item');
+        if (row) row.classList.toggle('checked', cb.checked);
+        updateCardProgress(t.id);
+      });
       const rm = document.getElementById(`rm-${t.id}-${tr.id}`);
       if (rm) rm.addEventListener('click', () => removeTrophy(t.id, tr.id));
     });
@@ -179,36 +250,102 @@ export function renderMyList() {
       const calChev = calBtn.querySelector('.cal-trainee-arrow');
       if (calBody) calBody.classList.toggle('open', willOpen);
       if (calChev) calChev.classList.toggle('open', willOpen);
+      calBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
     });
     const tabsBox = document.getElementById(`caltabs-${t.id}`);
-    if (tabsBox) tabsBox.querySelectorAll('.cal-tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        inlineCalTab[t.id] = btn.dataset.tab;
-        renderMyList();
+    if (tabsBox) {
+      wireTabArrowNav(tabsBox);
+      tabsBox.querySelectorAll('.cal-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const v = btn.dataset.tab;
+          if (![...CAL_YEAR_GROUPS, 'OoB'].includes(v)) return;
+          inlineCalTab[t.id] = v;
+          tabsBox.querySelectorAll('.cal-tab-btn').forEach(b => {
+            const on = b === btn;
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-selected', on ? 'true' : 'false');
+          });
+          const page = document.getElementById(`calpage-${t.id}`);
+          if (page) {
+            page.innerHTML = calPageHtml(t, v, { showAdd: true });
+            page.setAttribute('aria-labelledby', `caltab-${t.id}-${v}`);
+            wireCalPage(page, t, renderMyList);
+          }
+        });
       });
-    });
+    }
     const pageBox = document.getElementById(`calpage-${t.id}`);
     if (pageBox) wireCalPage(pageBox, t, renderMyList);
   });
 
-  renderPagination('my-pagination-top', 'my-pagination-bottom', myPage, totalPages, (nextPage) => {
+  renderPagination('my-pagination-top', 'my-pagination-bottom', myPage, totalPages, 'My List', (nextPage) => {
     myPage = nextPage;
     renderMyList();
+    scrollPagerIntoView('my-pagination-top');
+  });
   });
 }
 
-export function findRaceByExactName(name) {
-  const q = (name || "").trim().toLowerCase();
-  return RACES.find(r => r.name.toLowerCase() === q);
+export function goToTrainee(id) {
+  const idx = state.myList.findIndex(t => t.id === id);
+  if (idx === -1) return;
+  myPage = Math.floor(idx / MY_PAGE_SIZE) + 1;
+  renderMyList();
+  requestAnimationFrame(() => {
+    document.getElementById(`card-${id}`)?.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
+  });
 }
 
-export function raceMeta(race) {
-  return { grade: race.grade, track: race.track, distance: race.distance, year: race.year, turn: race.turn, month: race.month };
+function updateCardProgress(tid) {
+  const card = document.getElementById(`card-${tid}`);
+  const t = state.myList.find(x => x.id === tid);
+  if (!card || !t) return;
+  const total = t.trophies.length;
+  const done = t.trophies.filter(x => x.checked).length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const fill = card.querySelector('.progress-fill');
+  const label = card.querySelector('.progress-pct');
+  const track = card.querySelector('.progress-track');
+  if (fill) fill.style.width = pct + '%';
+  if (label) label.textContent = `${done}/${total} · ${pct}%`;
+  if (track) track.setAttribute('aria-valuenow', String(pct));
+}
+
+function syncCardTrophy(tid, raceName, checked) {
+  const t = state.myList.find(x => x.id === tid);
+  const tr = t ? t.trophies.find(x => traineeNameKey(x.name) === traineeNameKey(raceName)) : null;
+  if (!t || !tr) return;
+  const cb = document.getElementById(`cb-${tid}-${tr.id}`);
+  if (cb && cb.checked !== checked) cb.checked = checked;
+  const row = cb ? cb.closest('.trophy-item') : null;
+  if (row) row.classList.toggle('checked', checked);
+  updateCardProgress(tid);
+}
+
+function setActiveSuggestItem(box, input, item) {
+  if (!box) return;
+  box.querySelectorAll('.race-suggest-item.active').forEach(el => {
+    el.classList.remove('active');
+    el.setAttribute('aria-selected', 'false');
+  });
+  if (item) {
+    item.classList.add('active');
+    item.setAttribute('aria-selected', 'true');
+    if (input && item.id) input.setAttribute('aria-activedescendant', item.id);
+  } else if (input) {
+    input.removeAttribute('aria-activedescendant');
+  }
 }
 
 function hideSuggestBox(box) {
   if (!box) return;
   box.classList.remove('show');
+  const addWrap = box.closest('.add-trophy');
+  const input = addWrap ? addWrap.querySelector('input') : null;
+  if (input) {
+    input.setAttribute('aria-expanded', 'false');
+    input.removeAttribute('aria-activedescendant');
+  }
   const card = box.closest('.mycard');
   if (card) card.classList.remove('suggest-open');
 }
@@ -216,15 +353,18 @@ function hideSuggestBox(box) {
 function renderRaceSuggestions(trainee, query, box, inputEl) {
   if (!box) return;
   const q = (query || "").trim().toLowerCase();
-  const alreadyAdded = new Set(trainee.trophies.map(tr => tr.name.toLowerCase()));
+  const alreadyAdded = new Set(trainee.trophies.map(tr => traineeNameKey(tr.name)));
 
-  let matches = RACES.filter(r => !alreadyAdded.has(r.name.toLowerCase()));
+  let matches = RACES.filter(r => !alreadyAdded.has(traineeNameKey(r.name)));
   if (q) matches = matches.filter(r => r.name.toLowerCase().includes(q));
 
+  const customAllowed = state.settings.allowCustomTrophies;
+  const SUGGEST_CAP = 20;
   if (matches.length === 0) {
-    box.innerHTML = `<div class="race-suggest-empty">${q ? "No matching race — Enter adds it as a custom trophy." : "Type to search the race calendar."}</div>`;
+    box.innerHTML = `<div class="race-suggest-empty">${q ? (customAllowed ? "No matching race — Enter adds it as a custom trophy." : "No matching race. Custom trophies are disabled in settings.") : "Type to search the race calendar."}</div>`;
   } else {
-    box.innerHTML = matches.map(r => {
+    const shown = matches.slice(0, SUGGEST_CAP);
+    box.innerHTML = shown.map((r, i) => {
       const trackKey = TRACK_TO_APT_KEY[r.track];
       const distKey = DIST_TO_APT_KEY[r.distance];
       const trackGrade = gradeOf(trainee.aptitudes[trackKey]);
@@ -232,42 +372,23 @@ function renderRaceSuggestions(trainee, query, box, inputEl) {
       const trackTier = GRADE_INFO[trackGrade].tier;
       const distTier = GRADE_INFO[distGrade].tier;
       return `
-      <div class="race-suggest-item" data-race="${escapeHtml(r.name)}">
-        <span class="race-grade-tag" style="background:${calGradeColor(r.grade)}">${r.grade}</span>
+      <div class="race-suggest-item" id="${box.id}-opt-${i}" role="option" tabindex="-1" aria-selected="false" data-race="${escapeAttr(r.name)}">
+        <span class="race-grade-tag" style="background:${calGradeColor(r.grade)};color:${calGradeFg(r.grade)}">${r.grade}</span>
         <span class="race-info">
           <span class="race-name">${escapeHtml(r.name)}</span>
           <span class="race-date">${escapeHtml(raceDateLabel(r))}</span>
         </span>
         <span class="race-meta">
-          <span class="mini-tag" style="background:var(--${trackTier})">${r.track}</span>
-          <span class="mini-tag" style="background:var(--${distTier})">${r.distance}</span>
+          <span class="mini-tag" style="background:var(--${trackTier});color:${tagFgForVar(trackTier)}">${escapeHtml(r.track)} ${escapeHtml(trackGrade)}</span>
+          <span class="mini-tag" style="background:var(--${distTier});color:${tagFgForVar(distTier)}">${escapeHtml(r.distance)} ${escapeHtml(distGrade)}</span>
         </span>
       </div>`;
-    }).join("");
+    }).join("") + (matches.length > SUGGEST_CAP ? `<div class="race-suggest-empty">Showing ${SUGGEST_CAP} of ${matches.length} — keep typing to narrow.</div>` : "");
   }
   box.classList.add('show');
+  if (inputEl) inputEl.setAttribute('aria-expanded', 'true');
   const openCard = box.closest('.mycard');
   if (openCard) openCard.classList.add('suggest-open');
-
-  box.querySelectorAll('.race-suggest-item').forEach(item => {
-    item.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      const race = findRaceByExactName(item.dataset.race);
-      if (race) {
-        addTrophy(trainee.id, race.name, raceMeta(race));
-        inputEl.value = "";
-        hideSuggestBox(box);
-      }
-    });
-  });
-}
-
-export function addTrophyFromInput(tid, rawName) {
-  const name = (rawName || "").trim();
-  if (!name) return;
-  const race = findRaceByExactName(name);
-  if (!race && !state.settings.allowCustomTrophies) return;
-  addTrophy(tid, name, race ? raceMeta(race) : null);
 }
 
 function myCardHtml(t) {
@@ -288,20 +409,22 @@ function myCardHtml(t) {
         const distKey = DIST_TO_APT_KEY[tr.distance];
         const trackGrade = gradeOf(t.aptitudes[trackKey]);
         const distGrade = gradeOf(t.aptitudes[distKey]);
+        const trackTier = GRADE_INFO[trackGrade].tier;
+        const distTier = GRADE_INFO[distGrade].tier;
         const dateHtml = tr.year ? `<span class="trophy-date">${escapeHtml(raceDateLabel(tr))}</span>` : "";
         metaHtml = `
           ${dateHtml}
-          <span class="mini-tag" style="background:${calGradeColor(tr.grade)};color:#12141a">${tr.grade || ""}</span>
-          <span class="mini-tag" style="background:var(--${GRADE_INFO[trackGrade].tier})" title="${tr.track} aptitude: ${trackGrade}">${tr.track}</span>
-          <span class="mini-tag" style="background:var(--${GRADE_INFO[distGrade].tier})" title="${tr.distance} aptitude: ${distGrade}">${tr.distance}</span>
+          <span class="mini-tag" style="background:${calGradeColor(tr.grade)};color:${calGradeFg(tr.grade)}">${escapeHtml(tr.grade || "")}</span>
+          <span class="mini-tag" style="background:var(--${trackTier});color:${tagFgForVar(trackTier)}" title="${escapeAttr(tr.track)} aptitude: ${escapeAttr(trackGrade)}">${escapeHtml(tr.track)} ${escapeHtml(trackGrade)}</span>
+          <span class="mini-tag" style="background:var(--${distTier});color:${tagFgForVar(distTier)}" title="${escapeAttr(tr.distance)} aptitude: ${escapeAttr(distGrade)}">${escapeHtml(tr.distance)} ${escapeHtml(distGrade)}</span>
         `;
       }
       return `
       <div class="trophy-item ${tr.checked ? 'checked' : ''}">
-        <input type="checkbox" id="cb-${t.id}-${tr.id}" ${tr.checked ? 'checked' : ''}>
+        <input type="checkbox" id="cb-${t.id}-${tr.id}" aria-label="${escapeAttr(tr.name)}" ${tr.checked ? 'checked' : ''}>
         <span>${escapeHtml(tr.name)}</span>
         ${metaHtml}
-        <button class="rm" id="rm-${t.id}-${tr.id}">&times;</button>
+        <button class="rm" id="rm-${t.id}-${tr.id}" aria-label="Remove ${escapeAttr(tr.name)}">&times;</button>
       </div>`;
     }).join("")
     : `<div style="font-size:12px;color:var(--ink-faint);font-style:italic;">No races logged yet.</div>`;
@@ -313,8 +436,8 @@ function myCardHtml(t) {
 
   const inlineCalHtml = `
     <div class="inline-cal">
-      <button class="inline-cal-toggle" id="calbtn-${t.id}">
-        📅 Calendar
+      <button class="inline-cal-toggle" id="calbtn-${t.id}" aria-expanded="${openInlineCals.has(t.id) ? 'true' : 'false'}" aria-controls="calbody-${t.id}">
+        <span aria-hidden="true">📅</span> Calendar
         <span class="cal-trainee-arrow${openInlineCals.has(t.id) ? ' open' : ''}">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -322,145 +445,93 @@ function myCardHtml(t) {
         </span>
       </button>
       <div class="inline-cal-body ${openInlineCals.has(t.id) ? 'open' : ''}" id="calbody-${t.id}">
-        <div class="cal-tabs" id="caltabs-${t.id}">
-          ${inlineTabs.map(tab => `<button class="cal-tab-btn ${inlineActiveTab === tab ? 'active' : ''}" data-tab="${tab}">${tab === "OoB" ? "Out-of-Bond" : tab}</button>`).join("")}
+        <div class="cal-tabs" id="caltabs-${t.id}" role="tablist" aria-label="Year group">
+          ${inlineTabs.map(tab => `<button class="cal-tab-btn ${inlineActiveTab === tab ? 'active' : ''}" id="caltab-${t.id}-${tab}" data-tab="${tab}" role="tab" aria-selected="${inlineActiveTab === tab ? 'true' : 'false'}" aria-controls="calpage-${t.id}">${tab === "OoB" ? "Out-of-Bond" : tab}</button>`).join("")}
         </div>
-        <div class="cal-page" id="calpage-${t.id}">${calPageHtml(t, inlineActiveTab, { showAdd: true })}</div>
+        <div class="cal-page" id="calpage-${t.id}" role="tabpanel" aria-labelledby="caltab-${t.id}-${inlineActiveTab}">${calPageHtml(t, inlineActiveTab, { showAdd: true })}</div>
       </div>
     </div>`;
 
   return `
-  <div class="mycard">
+  <div class="mycard" id="card-${t.id}" data-tid="${t.id}">
     <div class="mycard-head">
       ${iconHtml(t.name, 48)}
-      <div class="mycard-name">${escapeHtml(t.name)}</div>
-      <button class="btn small ghost" id="del-${t.id}">Remove</button>
+      <h3 class="mycard-name">${escapeHtml(t.name)}</h3>
+      <button class="btn small ghost" id="del-${t.id}" aria-label="Remove ${escapeAttr(t.name)} from My List">Remove</button>
     </div>
     <div class="cats-row">${aptGroupsHtml(t.aptitudes)}</div>
     ${focusHtml}
     <div class="trophy-section">
       <div class="trophy-top">
         <span class="label">Completionist</span>
-        <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <div class="progress-track" role="progressbar" aria-label="Completionist progress for ${escapeAttr(t.name)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><div class="progress-fill" style="width:${pct}%"></div></div>
         <span class="progress-pct">${done}/${total} · ${pct}%</span>
       </div>
       <div class="trophy-list">${trophyHtml}</div>
       <div class="add-trophy">
-        <input type="text" id="addt-input-${t.id}" placeholder="Search races…" autocomplete="off">
-        <button class="btn small" id="addt-btn-${t.id}">+ Add</button>
-        <div class="race-suggest" id="addt-suggest-${t.id}"></div>
+        <input type="text" id="addt-input-${t.id}" placeholder="Search races…" autocomplete="off" aria-label="Search races to add for ${escapeAttr(t.name)}" role="combobox" aria-expanded="false" aria-controls="addt-suggest-${t.id}" aria-autocomplete="list" aria-haspopup="listbox">
+        <button class="btn small" id="addt-btn-${t.id}" aria-label="Add trophy for ${escapeAttr(t.name)}">+ Add</button>
+        <div class="race-suggest" id="addt-suggest-${t.id}" role="listbox" aria-label="Matching races"></div>
       </div>
     </div>
     ${inlineCalHtml}
   </div>`;
 }
 
-export function removeFromMyList(id) {
-  state.myList = state.myList.filter(t => t.id !== id);
-  saveState(); renderMyList(); renderDatabase();
-}
-export function addTrophy(tid, name, meta) {
-  name = (name || "").trim();
-  if (!name) return;
-  const t = state.myList.find(x => x.id === tid);
-  if (!t) return;
-  const normalizedName = name.toLowerCase();
-  if (t.trophies.some(tr => tr.name.toLowerCase() === normalizedName)) return;
-  const trophy = { id: uid(), name, checked: false };
-  if (meta) {
-    trophy.grade = meta.grade; trophy.track = meta.track; trophy.distance = meta.distance;
-    trophy.year = meta.year; trophy.turn = meta.turn; trophy.month = meta.month;
-  }
-  t.trophies.push(trophy);
-  saveState(); renderMyList();
-}
-export function toggleTrophy(tid, trid) {
-  const t = state.myList.find(x => x.id === tid);
-  if (!t) return;
-  const tr = t.trophies.find(x => x.id === trid);
-  if (!tr) return;
-  tr.checked = !tr.checked;
-  saveState(); renderMyList();
-}
-export function removeTrophy(tid, trid) {
-  const t = state.myList.find(x => x.id === tid);
-  if (!t) return;
-  t.trophies = t.trophies.filter(x => x.id !== trid);
-  saveState(); renderMyList();
-}
 export function addCustom() {
   if (!state.settings.allowCustomTrainees) return;
   const input = document.getElementById('custom-name');
   const name = input.value.trim();
   if (!name) { input.focus(); return; }
-  addToMyList(name, { turf: "A", dirt: "A", sprint: "A", mile: "A", medium: "A", long: "A" });
-  input.value = "";
-}
-
-function backupFilename() {
-  const d = new Date();
-  const pad = n => String(n).padStart(2, '0');
-  const yy = pad(d.getFullYear() % 100);
-  const mm = pad(d.getMonth() + 1);
-  const dd = pad(d.getDate());
-  const hh = pad(d.getHours());
-  const mi = pad(d.getMinutes());
-  const ss = pad(d.getSeconds());
-  return `CompBoard-${yy}${mm}${dd}-${hh}${mi}${ss}.json`;
-}
-export function exportList() {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = backupFilename();
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-function importListFromJsonText(text) {
-  try {
-    const parsed = JSON.parse(text);
-    if (!parsed || !Array.isArray(parsed.myList)) throw new Error("bad format");
-    const knownNames = new Set(state.myList.map(trainee => trainee.name.toLocaleLowerCase()));
-    const trainees = normalizeImportedTrainees(parsed.myList, state.myList).filter(trainee => {
-      const key = trainee.name.toLocaleLowerCase();
-      if (knownNames.has(key)) return false;
-      knownNames.add(key);
-      return true;
-    });
-    state.myList.push(...trainees);
-    saveState(); renderMainView();
-    if (trainees.length !== parsed.myList.length) {
-      alert(`Imported ${trainees.length} trainee${trainees.length === 1 ? '' : 's'}. Duplicate or invalid entries were skipped.`);
-    }
-    return true;
-  } catch (e) {
-    alert("Couldn't read that — expected a Completionist Board export.");
-    return false;
+  if (addToMyList(name, { turf: "A", dirt: "A", sprint: "A", mile: "A", medium: "A", long: "A" })) {
+    input.value = "";
+  } else {
+    input.focus();
+    input.select();
   }
-}
-export function importListFromText(text) {
-  return importListFromJsonText(text);
-}
-export function importList(file) {
-  const reader = new FileReader();
-  reader.onload = () => { importListFromJsonText(reader.result); };
-  reader.readAsText(file);
 }
 
 function wireBlockCollapse(toggleBtn, body) {
   if (!toggleBtn || !body) return;
+
+  body.classList.add('open', 'overflow-visible');
+  body.style.maxHeight = 'none';
+
+  const baseLabel = toggleBtn.getAttribute('aria-label') || 'Toggle section';
+  const setExpanded = (open) => {
+    toggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggleBtn.setAttribute('aria-label', open
+      ? baseLabel.replace(/^Expand/i, 'Collapse')
+      : baseLabel.replace(/^Collapse/i, 'Expand'));
+    const arrow = toggleBtn.querySelector('.cal-trainee-arrow');
+    if (arrow) arrow.classList.toggle('open', open);
+  };
+  setExpanded(true);
+
   toggleBtn.addEventListener('click', () => {
     const willOpen = !body.classList.contains('open');
-    if (!willOpen) {
-      body.classList.remove('overflow-visible');
+    body.classList.remove('overflow-visible');
+
+    if (willOpen) {
+      body.style.maxHeight = '0px';
+      void body.offsetHeight;
+      body.classList.add('open');
+      body.style.maxHeight = body.scrollHeight + 'px';
+    } else {
+      body.style.maxHeight = body.scrollHeight + 'px';
+      void body.offsetHeight;
+      body.classList.remove('open');
+      body.style.maxHeight = '0px';
     }
-    body.classList.toggle('open', willOpen);
-    const arrow = toggleBtn.querySelector('.cal-trainee-arrow');
-    if (arrow) arrow.classList.toggle('open', willOpen);
+    body.inert = !willOpen;
+    if (!willOpen && body.contains(document.activeElement)) toggleBtn.focus();
+    setExpanded(willOpen);
   });
+
   body.addEventListener('transitionend', (e) => {
     if (e.propertyName !== 'max-height') return;
     if (body.classList.contains('open')) {
+      body.style.maxHeight = 'none';
       body.classList.add('overflow-visible');
     }
   });
@@ -478,10 +549,82 @@ export function wireStandardViewControls() {
     btn.addEventListener('click', () => {
       dbSort = btn.dataset.sort;
       dbPage = 1;
-      document.querySelectorAll('#db-sort .sort-btn').forEach(b => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('#db-sort .sort-btn').forEach(b => {
+        const on = b === btn;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
       renderDatabase();
     });
   });
+
+  const wrap = document.getElementById('mylist');
+  if (wrap && !wrap.dataset.suggestWired) {
+    wrap.dataset.suggestWired = 'true';
+    let lastPick = { race: '', at: 0 };
+    const pickSuggestItem = (e) => {
+      const item = e.target && e.target.closest ? e.target.closest('.race-suggest-item') : null;
+      if (!item || !wrap.contains(item)) return;
+      if (e.type === 'mousedown') e.preventDefault();
+      // mousedown is followed by click — handle once.
+      const now = Date.now();
+      if (e.type === 'click' && item.dataset.race === lastPick.race && now - lastPick.at < 500) return;
+      lastPick = { race: item.dataset.race, at: now };
+      const addWrap = item.closest('.add-trophy');
+      const input = addWrap ? addWrap.querySelector('input') : null;
+      const tid = input ? input.id.replace('addt-input-', '') : '';
+      if (!tid || !input) return;
+      const race = findRaceByExactName(item.dataset.race);
+      if (race && addTrophy(tid, race.name, raceMeta(race))) {
+        input.value = "";
+        const host = state.myList.find(x => x.id === tid);
+        const added = host ? host.trophies.find(tr => traineeNameKey(tr.name) === traineeNameKey(race.name)) : null;
+        if (added) showToast(`Added ${race.name} to ${host.name}'s list.`, {
+          actionLabel: 'Undo',
+          duration: 8000,
+          onAction: () => removeTrophy(tid, added.id)
+        });
+      }
+      hideSuggestBox(item.closest('.race-suggest'));
+    };
+    wrap.addEventListener('mousedown', pickSuggestItem);
+    wrap.addEventListener('click', pickSuggestItem);
+    wrap.addEventListener('mouseover', (e) => {
+      const item = e.target && e.target.closest ? e.target.closest('.race-suggest-item') : null;
+      if (!item || !wrap.contains(item)) return;
+      const box = item.closest('.race-suggest');
+      const input = box ? box.closest('.add-trophy')?.querySelector('input') : null;
+      setActiveSuggestItem(box, input, item);
+    });
+  }
+
+  if (!window._cbViewTraineeWired) {
+    window._cbViewTraineeWired = true;
+    window.addEventListener('cb-view-trainee', (e) => {
+      if (e && e.detail && e.detail.id) goToTrainee(e.detail.id);
+    });
+    window.addEventListener('cb-card-progress', (e) => {
+      const d = e && e.detail;
+      if (!d || !d.id) return;
+      syncCardTrophy(d.id, d.race, d.checked);
+    });
+    // Membership changes patch the DB button + counts without rebuilding the grid.
+    window.addEventListener('cb-db-button', (e) => {
+      const d = e && e.detail;
+      if (!d || !d.name) return;
+      const key = traineeNameKey(d.name);
+      document.getElementById('my-count').textContent = `${state.myList.length}/${DATABASE.length}`;
+      const grid = document.getElementById('db-grid');
+      if (!grid) return;
+      grid.querySelectorAll('[data-add]').forEach(btn => {
+        const idx = Number(btn.dataset.add);
+        if (!Number.isInteger(idx) || idx < 0 || idx >= DATABASE.length) return;
+        if (traineeNameKey(DATABASE[idx].name) !== key) return;
+        btn.disabled = !!d.inList;
+        btn.textContent = d.inList ? '✓ In my list' : '+ Add to my list';
+      });
+    });
+  }
 
   wireBlockCollapse(document.getElementById('db-collapse-btn'), document.getElementById('db-block-body'));
   wireBlockCollapse(document.getElementById('my-collapse-btn'), document.getElementById('my-block-body'));

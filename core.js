@@ -1,4 +1,6 @@
 import { RACES } from './data/races.js';
+import { DATABASE } from './data/database.js';
+import { renderMyList } from './render-bus.js';
 
 export const GRADES = ["A", "B", "C", "D", "E", "F", "G"];
 export const GRADE_INFO = {
@@ -42,6 +44,15 @@ const SAFE_ID = /^[a-z0-9]{7}$/;
 const MAX_NAME_LENGTH = 120;
 const MAX_NOTE_LENGTH = 500;
 const MAX_TROPHIES_PER_TRAINEE = 300;
+export const MAX_MY_LIST = 1000;
+export const MAX_IMPORT_TRAINEES = 500;
+export const MAX_IMPORT_TROPHIES = 6000;
+export const MAX_STORED_BYTES = 2 * 1024 * 1024;
+const VALID_CAL_MONTHS = new Set([
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+]);
+const VALID_CAL_TURNS = new Set(["Early", "Late"]);
 
 function defaultSettings() {
   return {
@@ -50,7 +61,9 @@ function defaultSettings() {
     calendarViewMode: false,
     lightMode: false,
     colorTheme: 'turf',
-    activeTraineeId: null
+    activeTraineeId: null,
+    navbarPositionDesktop: 'right',
+    navbarPositionMobile: 'bottom'
   };
 }
 export let state = {
@@ -59,7 +72,12 @@ export let state = {
 };
 let saveQueue = Promise.resolve();
 
-export function uid() { return Math.random().toString(36).slice(2, 9); }
+const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789';
+export function uid() {
+  let id = '';
+  for (let i = 0; i < 7; i++) id += ID_CHARS[Math.floor(Math.random() * ID_CHARS.length)];
+  return id;
+}
 export function debounce(fn, delay = 150) {
   let timer;
   return (...args) => {
@@ -114,7 +132,7 @@ function normalizeTrophy(value, usedIds) {
     name,
     checked: value.checked === true
   };
-  const race = RACES.find(item => item.name.toLowerCase() === name.toLowerCase());
+  const race = RACE_BY_NAME.get(name.toLowerCase());
   if (race) {
     trophy.grade = race.grade;
     trophy.track = race.track;
@@ -125,12 +143,18 @@ function normalizeTrophy(value, usedIds) {
   }
   return trophy;
 }
+function isValidSlotKey(slotKey) {
+  if (typeof slotKey !== 'string') return false;
+  const parts = slotKey.split('|');
+  if (parts.length !== 2) return false;
+  return VALID_CAL_MONTHS.has(parts[0]) && VALID_CAL_TURNS.has(parts[1]);
+}
 function normalizeCalendarOrder(value) {
   if (!isPlainObject(value)) return {};
   const validRaceNames = new Set(RACES.map(race => race.name));
   const order = {};
   for (const [slotKey, names] of Object.entries(value)) {
-    if (!Array.isArray(names) || !/^[A-Z][a-z]+|(Early|Late)$/.test(slotKey)) continue;
+    if (!Array.isArray(names) || !isValidSlotKey(slotKey)) continue;
     order[slotKey] = names
       .filter(name => typeof name === 'string' && validRaceNames.has(name))
       .slice(0, RACES.length);
@@ -156,13 +180,32 @@ function normalizeTrainee(value, usedTraineeIds) {
     calendarOrder: normalizeCalendarOrder(value.calendarOrder)
   };
 }
-function normalizeSettings(value, trainees) {
+export function normalizeSettings(value, trainees) {
   const raw = isPlainObject(value) ? value : {};
   const settings = defaultSettings();
   for (const key of ['allowCustomTrainees', 'allowCustomTrophies', 'calendarViewMode', 'lightMode']) {
     if (typeof raw[key] === 'boolean') settings[key] = raw[key];
   }
   settings.colorTheme = raw.colorTheme === 'dirt' ? 'dirt' : 'turf';
+
+  // Migration: legacy single-field `navbarPosition` → two-field model.
+  const legacy = ['left', 'bottom', 'right', 'top'].includes(raw.navbarPosition)
+    ? raw.navbarPosition
+    : null;
+
+  const desktopRaw = raw.navbarPositionDesktop ?? legacy ?? 'right';
+  settings.navbarPositionDesktop = ['left', 'bottom', 'right', 'top'].includes(desktopRaw)
+    ? desktopRaw
+    : 'right';
+
+  const mobileRaw = raw.navbarPositionMobile ?? legacy ?? 'bottom';
+  if (['top', 'bottom'].includes(mobileRaw)) {
+    settings.navbarPositionMobile = mobileRaw;
+  } else {
+    // Legacy 'left'/'right' has no mobile equivalent — the visual default is bottom.
+    settings.navbarPositionMobile = 'bottom';
+  }
+
   if (typeof raw.activeTraineeId === 'string' && trainees.some(t => t.id === raw.activeTraineeId)) {
     settings.activeTraineeId = raw.activeTraineeId;
   }
@@ -185,61 +228,152 @@ function normalizeState(value) {
   const myList = normalizeTraineeList(raw.myList);
   return { myList, settings: normalizeSettings(raw.settings, myList) };
 }
+let storageHealthy = true;
 export async function loadState() {
+  let parsed = null;
   try {
     if (window.storage && typeof window.storage.get === 'function') {
       const res = await window.storage.get('mylist', false);
-      if (res && res.value) { state = normalizeState(JSON.parse(res.value)); }
+      if (res && res.value) {
+        if (res.value.length > MAX_STORED_BYTES) throw new Error("stored data too large");
+        parsed = JSON.parse(res.value);
+      }
     } else {
       const val = localStorage.getItem('mylist');
-      if (val) { state = normalizeState(JSON.parse(val)); }
-    }
-  } catch (e) { console.error("Storage load failed", e); }
-  state = normalizeState(state);
-}
-export function saveState() {
-  let snapshot;
-  try {
-    snapshot = JSON.stringify(state);
-  } catch (e) {
-    console.error("Storage serialization failed", e);
-    return Promise.resolve();
-  }
-  saveQueue = saveQueue.catch(() => {}).then(async () => {
-    try {
-      if (window.storage && typeof window.storage.set === 'function') {
-        await window.storage.set('mylist', snapshot, false);
-      } else {
-        localStorage.setItem('mylist', snapshot);
+      if (val) {
+        if (val.length > MAX_STORED_BYTES) throw new Error("stored data too large");
+        parsed = JSON.parse(val);
       }
-    } catch (e) {
-      console.error("Storage save failed", e);
     }
-  });
-  return saveQueue;
+  } catch (e) {
+    console.error("Storage load failed", e);
+    storageHealthy = false;
+    showToast("Saved data couldn't be read — starting fresh. Export a backup before making changes.", { kind: 'error', duration: 0 });
+  }
+  if (storageHealthy) state = normalizeState(parsed);
 }
+let saveTimer = null;
+let saveFlush = null;
+export function saveState() {
+  // Never autosave over data we failed to load (would destroy it).
+  if (!storageHealthy) return Promise.resolve();
+  // Coalesce rapid toggles/drags into one trailing write; snapshot at flush.
+  if (!saveFlush) {
+    saveFlush = new Promise((resolve) => {
+      saveTimer = setTimeout(async () => {
+        saveTimer = null;
+        let snapshot;
+        try {
+          snapshot = JSON.stringify(state);
+        } catch (e) {
+          console.error("Storage serialization failed", e);
+          saveFlush = null;
+          resolve();
+          return;
+        }
+        saveQueue = saveQueue.catch(() => {}).then(async () => {
+          try {
+            if (window.storage && typeof window.storage.set === 'function') {
+              await window.storage.set('mylist', snapshot, false);
+            } else {
+              localStorage.setItem('mylist', snapshot);
+            }
+          } catch (e) {
+            console.error("Storage save failed", e);
+            const isQuota = e && (e.name === 'QuotaExceededError' || e.code === 22);
+            const message = isQuota
+              ? "Storage is full — changes are NOT being saved. Export a backup, then remove old trainees."
+              : "Couldn't save your list in this browser.";
+            try {
+              window.dispatchEvent(new CustomEvent('cb-toast', { detail: { message, kind: 'error', duration: isQuota ? 0 : 5000 } }));
+            } catch (_) { /* ignore toast bridge failures */ }
+          }
+        });
+        await saveQueue;
+        saveFlush = null;
+        resolve();
+      }, 150);
+    });
+  }
+  return saveFlush;
+}
+
+/* Re-run a render while keeping keyboard focus on the invoking control.
+ * Matches by stable id, else by data attrs within the same id'd container. */
+export function withFocusKept(fn) {
+  const a = typeof document !== 'undefined' ? document.activeElement : null;
+  let restore = null;
+  if (a && a.isConnected && a !== document.body) {
+    if (a.id) {
+      const id = a.id;
+      restore = () => document.getElementById(id)?.focus({ preventScroll: true });
+    } else if (a.dataset) {
+      const d = a.dataset;
+      const host = a.closest ? a.closest('[id]') : null;
+      const key = d.page !== undefined && d.page !== ''
+        ? `[data-page="${CSS.escape(d.page)}"]`
+        : d.pageAction ? `[data-page-action="${CSS.escape(d.pageAction)}"]`
+        : d.switch ? `[data-switch="${CSS.escape(d.switch)}"]`
+        : d.remove ? `[data-remove="${CSS.escape(d.remove)}"]`
+        : d.addswitch ? `[data-addswitch="${CSS.escape(d.addswitch)}"]`
+        : (d.move && d.race) ? `.cal-race-move[data-race="${CSS.escape(d.race)}"][data-move="${CSS.escape(d.move)}"]`
+        : null;
+      if (host && host.id && key) {
+        const hid = host.id;
+        restore = () => document.getElementById(hid)?.querySelector(key)?.focus({ preventScroll: true });
+      }
+    }
+  }
+  fn();
+  try { restore?.(); } catch (_) { /* focus restore is best-effort */ }
+}
+
+/* ---------- Escaping ---------- */
+// escapeHtml is for text nodes / element content (does NOT escape quotes).
+// escapeAttr is for anything interpolated into an HTML attribute value.
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 export function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+  return String(str).replace(/[&<>]/g, ch => HTML_ESCAPES[ch]);
 }
+export function escapeAttr(str) {
+  return String(str).replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
+}
+
 export function gradeOf(v) { return typeof v === 'string' ? v : v.base; }
 export function altOf(v) { return typeof v === 'string' ? null : v; }
-export const tooltipEl = document.getElementById('tooltip');
+
+/* ---------- Tooltip ---------- */
+let tooltipEl = null;
 let tooltipTarget = null;
+function ensureTooltipEl() {
+  if (!tooltipEl) {
+    tooltipEl = document.getElementById('tooltip');
+    if (tooltipEl) tooltipEl.setAttribute('role', 'tooltip');
+  }
+  return tooltipEl;
+}
 function positionTooltip(target) {
-  if (!target || !tooltipEl) return;
+  const el = ensureTooltipEl();
+  if (!target || !el) return;
   const rect = target.getBoundingClientRect();
-  const tooltipWidth = tooltipEl.getBoundingClientRect().width;
-  tooltipEl.style.left = Math.min(rect.left, window.innerWidth - tooltipWidth - 16) + "px";
+  const tipRect = el.getBoundingClientRect();
+  const tooltipWidth = tipRect.width;
+  const tooltipHeight = tipRect.height;
   const gap = 8;
-  const tooltipHeight = tooltipEl.getBoundingClientRect().height;
+  const left = Math.max(gap, Math.min(rect.left, window.innerWidth - tooltipWidth - 16));
+  el.style.left = left + "px";
   let top = rect.top - tooltipHeight - gap;
   if (top < gap) top = rect.bottom + gap;
-  tooltipEl.style.top = top + "px";
-  tooltipEl.classList.add('show');
+  // Clamp bottom edge so flipped-below tooltips stay onscreen.
+  top = Math.min(top, window.innerHeight - tooltipHeight - gap);
+  if (top < gap) top = gap;
+  el.style.top = Math.max(top, gap) + "px";
+  el.classList.add('show');
+  el.setAttribute('aria-hidden', 'false');
 }
 export function showTooltip(target, catKey, aptValue) {
+  const el = ensureTooltipEl();
+  if (!el) return;
   const cat = CATS.find(c => c.key === catKey);
   const grade = gradeOf(aptValue);
   const alt = altOf(aptValue);
@@ -252,28 +386,34 @@ export function showTooltip(target, catKey, aptValue) {
   if (alt) {
     html += `<div class="tt-variant">${escapeHtml(alt.note)}</div>`;
   }
-  tooltipEl.style.width = '';
-  tooltipEl.style.maxWidth = '';
-  tooltipEl.style.borderTopColor = `var(--${info.tier})`;
-  tooltipEl.innerHTML = html;
+  el.style.width = '';
+  el.style.maxWidth = '';
+  el.style.borderTopColor = `var(--${info.tier})`;
+  el.innerHTML = html;
   tooltipTarget = target;
   positionTooltip(target);
 }
 export function showTextTooltip(target, text) {
-  tooltipEl.style.width = 'auto';
-  tooltipEl.style.maxWidth = '200px';
-  tooltipEl.style.borderTopColor = '';
-  tooltipEl.innerHTML = `<div>${escapeHtml(text)}</div>`;
+  const el = ensureTooltipEl();
+  if (!el) return;
+  el.style.width = 'auto';
+  el.style.maxWidth = '200px';
+  el.style.borderTopColor = '';
+  el.innerHTML = `<div>${escapeHtml(text)}</div>`;
   tooltipTarget = target;
   positionTooltip(target);
 }
 export function hideTooltip() {
   tooltipTarget = null;
-  tooltipEl.classList.remove('show');
+  const el = ensureTooltipEl();
+  if (!el) return;
+  el.classList.remove('show');
+  el.setAttribute('aria-hidden', 'true');
 }
 
 function repositionTooltip() {
-  if (!tooltipTarget || !tooltipEl.classList.contains('show')) return;
+  const el = ensureTooltipEl();
+  if (!tooltipTarget || !el || !el.classList.contains('show')) return;
   if (!tooltipTarget.isConnected) {
     hideTooltip();
     return;
@@ -284,7 +424,7 @@ function repositionTooltip() {
 // Scroll events do not bubble from nested scrollers, so capture them at document level.
 document.addEventListener('scroll', repositionTooltip, true);
 window.addEventListener('resize', repositionTooltip);
-export const CHEVRON_SVG = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
 export function chipHtml(apt, key) {
   const cat = CATS.find(c => c.key === key);
   const value = apt[key];
@@ -292,16 +432,20 @@ export function chipHtml(apt, key) {
   const alt = altOf(value);
   const tier = GRADE_INFO[grade].tier;
   const label = `${cat.label} ${grade}${alt ? '/' + alt.alt : ''}`;
+  const tipTable = cat.group === 'surface' ? GRADE_TIP_SURFACE : GRADE_TIP_DISTANCE;
+  const pct = tipTable[grade] ? tipTable[grade].pct : '';
+  const ariaLabel = `${cat.label} aptitude ${grade}${alt ? ', alternate ' + alt.alt : ''}, ${cat.stat} ${pct}`;
   const borderMix = `color-mix(in srgb, var(--${tier}) 55%, transparent)`;
-  const glowMix = `color-mix(in srgb, var(--${tier}) 80%, transparent)`;
+  const glowMix = `color-mix(in srgb, var(--${tier}) 40%, transparent)`;
   let bg = `color-mix(in srgb, var(--${tier}) 24%, transparent)`;
   if (alt) {
     const altTier = GRADE_INFO[alt.alt].tier;
     bg = `linear-gradient(90deg, color-mix(in srgb, var(--${tier}) 26%, transparent) 50%, color-mix(in srgb, var(--${altTier}) 26%, transparent) 50%)`;
   }
   const style = `--chip-bg:${bg};--chip-border:${borderMix};--chip-glow:${glowMix};`;
-  const safeJson = JSON.stringify(value).replace(/'/g, '&#39;');
-  return `<button class="chip" style="${style}" data-cat="${key}" data-json='${safeJson}'>${label}</button>`;
+  // N6: escapeAttr round-trips correctly for any string (including literal `&amp;`).
+  const safeJson = escapeAttr(JSON.stringify(value));
+  return `<span class="chip" tabindex="0" role="img" style="${style}" data-cat="${key}" data-json='${safeJson}' aria-label="${escapeAttr(ariaLabel)}" aria-describedby="tooltip">${label}</span>`;
 }
 export function aptGroupsHtml(apt) {
   return `<div class="apt-groups">
@@ -324,10 +468,12 @@ export function wireChips(root) {
     const chip = e.target.closest('.chip');
     if (chip && root.contains(chip)) {
       if (chip.contains(e.relatedTarget)) return;
-      showTooltip(chip, chip.dataset.cat, JSON.parse(chip.dataset.json));
+      try {
+        showTooltip(chip, chip.dataset.cat, JSON.parse(chip.dataset.json));
+      } catch (_) { /* ignore tampered chip payloads */ }
       return;
     }
-    const iconBtn = e.target.closest('.icon-pill-btn[data-tooltip]');
+    const iconBtn = e.target.closest('[data-tooltip]');
     if (iconBtn && root.contains(iconBtn)) {
       if (iconBtn.contains(e.relatedTarget)) return;
       showTextTooltip(iconBtn, iconBtn.dataset.tooltip);
@@ -340,7 +486,7 @@ export function wireChips(root) {
       hideTooltip();
       return;
     }
-    const iconBtn = e.target.closest('.icon-pill-btn[data-tooltip]');
+    const iconBtn = e.target.closest('[data-tooltip]');
     if (iconBtn && root.contains(iconBtn)) {
       if (iconBtn.contains(e.relatedTarget)) return;
       hideTooltip();
@@ -349,10 +495,12 @@ export function wireChips(root) {
   root.addEventListener('focusin', (e) => {
     const chip = e.target.closest('.chip');
     if (chip && root.contains(chip)) {
-      showTooltip(chip, chip.dataset.cat, JSON.parse(chip.dataset.json));
+      try {
+        showTooltip(chip, chip.dataset.cat, JSON.parse(chip.dataset.json));
+      } catch (_) { /* ignore tampered chip payloads */ }
       return;
     }
-    const iconBtn = e.target.closest('.icon-pill-btn[data-tooltip]');
+    const iconBtn = e.target.closest('[data-tooltip]');
     if (iconBtn && root.contains(iconBtn)) {
       showTextTooltip(iconBtn, iconBtn.dataset.tooltip);
     }
@@ -363,7 +511,7 @@ export function wireChips(root) {
       hideTooltip();
       return;
     }
-    const iconBtn = e.target.closest('.icon-pill-btn[data-tooltip]');
+    const iconBtn = e.target.closest('[data-tooltip]');
     if (iconBtn && root.contains(iconBtn)) {
       hideTooltip();
     }
@@ -372,16 +520,23 @@ export function wireChips(root) {
 export function slugify(name) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
+const KNOWN_ICON_SLUGS = new Set(DATABASE.map(d => slugify(d.name)));
 export function iconHtml(name, size) {
   const slug = slugify(name);
-  const initial = (name.trim()[0] || '?').toUpperCase();
-  return `<div class="trainee-icon" style="--icon-size:${size}px">
-  <img src="icons/${slug}.png" alt="" loading="lazy">
-  <span class="icon-fallback">${initial}</span>
+  const px = Math.min(96, Math.max(16, Number(size) || 32));
+  const initial = escapeHtml((name.trim()[0] || '?').toUpperCase());
+  // Custom names have no icon file — render the fallback directly, no 404.
+  const img = KNOWN_ICON_SLUGS.has(slug)
+    ? `<img src="./icons/${slug}.png" alt="" loading="lazy" decoding="async">`
+    : '';
+  return `<div class="trainee-icon" style="--icon-size:${px}px">
+  ${img}
+  <span class="icon-fallback"${img ? '' : ' style="display:flex"'}>${initial}</span>
 </div>`;
 }
 export function blankIconHtml(size) {
-  return `<div class="trainee-icon trainee-icon-blank" style="--icon-size:${size}px"></div>`;
+  const px = Math.min(96, Math.max(16, Number(size) || 32));
+  return `<div class="trainee-icon trainee-icon-blank" style="--icon-size:${px}px"></div>`;
 }
 export function raceDateLabel(r) {
   const yearLabel = r.year.replace(/,\s*/g, '/');
@@ -398,4 +553,274 @@ export function sortRowsByMode(rows, mode) {
   if (mode === "az") return [...rows].sort((a, b) => a.name.localeCompare(b.name));
   if (mode === "za") return [...rows].sort((a, b) => b.name.localeCompare(a.name));
   return rows;
+}
+
+/* ---------- Shared trainee-name canonicalisation ---------- */
+export function traineeNameKey(name) {
+  return (name || "")
+    .normalize('NFKC')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLocaleLowerCase();
+}
+
+/* ---------- Race helpers ---------- */
+const RACE_BY_NAME = new Map(RACES.map(r => [(r.name || "").trim().toLowerCase(), r]));
+export function findRaceByExactName(name) {
+  const q = (name || "").trim().toLowerCase();
+  return RACE_BY_NAME.get(q);
+}
+export function raceMeta(race) {
+  return {
+    grade: race.grade, track: race.track, distance: race.distance,
+    year: race.year, turn: race.turn, month: race.month
+  };
+}
+
+/* ---------- State actions (render via bus to avoid cycles) ---------- */
+
+export function addToMyList(name, apt, opts = {}) {
+  const { announce = true } = opts;
+  const normalizedName = traineeNameKey(name);
+  if (!normalizedName) return null;
+  if (state.myList.some(t => traineeNameKey(t.name) === normalizedName)) {
+    if (announce) showToast(`“${name.normalize('NFKC').trim().replace(/\s+/g, ' ')}” is already in My List.`);
+    return null;
+  }
+  if (state.myList.length >= MAX_MY_LIST) {
+    if (announce) showToast(`My List is full (${MAX_MY_LIST}). Remove someone first.`, { kind: 'error' });
+    return null;
+  }
+  const canonicalName = safeText(name.normalize('NFKC').trim().replace(/\s+/g, ' '), MAX_NAME_LENGTH);
+  if (!canonicalName) return null;
+  const trainee = { id: uid(), name: canonicalName, aptitudes: apt, trophies: [] };
+  state.myList.push(trainee);
+  saveState();
+  renderMyList();
+  window.dispatchEvent(new CustomEvent('cb-db-button', { detail: { name: canonicalName, inList: true } }));
+  if (announce) showToast(`Added ${canonicalName} to My List.`, {
+    actionLabel: 'View',
+    duration: 8000,
+    onAction: () => {
+      window.dispatchEvent(new CustomEvent('cb-view-trainee', { detail: { id: trainee.id } }));
+    }
+  });
+  return trainee;
+}
+
+export function removeFromMyList(id) {
+  const index = state.myList.findIndex(t => t.id === id);
+  if (index === -1) return;
+  const [removed] = state.myList.splice(index, 1);
+  if (state.settings.activeTraineeId === id) {
+    state.settings.activeTraineeId = state.myList.length ? state.myList[0].id : null;
+  }
+  saveState();
+  renderMyList();
+  window.dispatchEvent(new CustomEvent('cb-db-button', { detail: { name: removed.name, inList: false } }));
+  showToast(`Removed ${removed.name}`, {
+    actionLabel: 'Undo',
+    duration: 8000,
+    onAction: () => {
+      if (state.myList.some(t => traineeNameKey(t.name) === traineeNameKey(removed.name))) {
+        showToast(`Couldn't undo — “${removed.name}” is already in My List.`, { kind: 'error' });
+        return;
+      }
+      const at = Math.min(index, state.myList.length);
+      state.myList.splice(at, 0, removed);
+      saveState();
+      renderMyList();
+      window.dispatchEvent(new CustomEvent('cb-db-button', { detail: { name: removed.name, inList: true } }));
+    }
+  });
+}
+
+export function addTrophy(tid, name, meta) {
+  const clean = safeText(name, MAX_NAME_LENGTH);
+  if (!clean) return false;
+  const t = state.myList.find(x => x.id === tid);
+  if (!t) return false;
+  if (t.trophies.length >= MAX_TROPHIES_PER_TRAINEE) {
+    showToast(`${t.name} already has ${MAX_TROPHIES_PER_TRAINEE} trophies.`, { kind: 'error' });
+    return false;
+  }
+  const key = traineeNameKey(clean);
+  if (t.trophies.some(tr => traineeNameKey(tr.name) === key)) return false;
+  const trophy = { id: uid(), name: clean, checked: false };
+  if (meta) {
+    trophy.grade = meta.grade; trophy.track = meta.track; trophy.distance = meta.distance;
+    trophy.year = meta.year; trophy.turn = meta.turn; trophy.month = meta.month;
+  }
+  t.trophies.push(trophy);
+  saveState(); renderMyList();
+  return true;
+}
+
+export function setTrophyChecked(tid, trid, checked) {
+  const t = state.myList.find(x => x.id === tid);
+  if (!t) return null;
+  const tr = t.trophies.find(x => x.id === trid);
+  if (!tr) return null;
+  tr.checked = checked;
+  saveState();
+  return { trainee: t, trophy: tr };
+}
+
+export function removeTrophy(tid, trid) {
+  const t = state.myList.find(x => x.id === tid);
+  if (!t) return;
+  const index = t.trophies.findIndex(x => x.id === trid);
+  if (index === -1) return;
+  const [removed] = t.trophies.splice(index, 1);
+  saveState(); renderMyList();
+  showToast(`Removed ${removed.name}`, {
+    actionLabel: 'Undo',
+    duration: 8000,
+    onAction: () => {
+      const host = state.myList.find(x => x.id === tid);
+      if (!host) {
+        showToast(`Couldn't undo — ${t.name} is no longer in My List.`, { kind: 'error' });
+        return;
+      }
+      host.trophies.splice(Math.min(index, host.trophies.length), 0, removed);
+      saveState(); renderMyList();
+    }
+  });
+}
+
+export function addTrophyFromInput(tid, rawName) {
+  const name = (rawName || "").trim();
+  if (!name) return false;
+  const race = findRaceByExactName(name);
+  if (!race && !state.settings.allowCustomTrophies) {
+    showToast("Custom trophies are disabled in settings.", { kind: 'error' });
+    return false;
+  }
+  const host = state.myList.find(x => x.id === tid);
+  if (host && host.trophies.some(tr => traineeNameKey(tr.name) === traineeNameKey(name))) {
+    showToast(`“${name}” is already in ${host.name}'s list.`);
+    return false;
+  }
+  return addTrophy(tid, name, race ? raceMeta(race) : null);
+}
+
+/* Contrast-checked tag foregrounds (measured 2026-09-20):
+ * bright tier greens/yellow/orange (a-f, g3) read best with dark text
+ * (6-12:1 vs 1.5-3:1 for white); only the dark bgs g (#c23f5a, 5.06:1)
+ * and g1 (#2f6fd0, 4.88:1) need white text. */
+const LIGHT_TEXT_TAG_VARS = new Set(['g1', 'g']);
+export function tagFgForVar(varName) {
+  return LIGHT_TEXT_TAG_VARS.has(varName) ? '#fff' : '#12141a';
+}
+
+export function wireTabArrowNav(container) {
+  if (!container || container.dataset.tabsWired) return;
+  container.dataset.tabsWired = 'true';
+  container.addEventListener('keydown', (e) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    const tabs = [...container.querySelectorAll('[role="tab"]')];
+    if (tabs.length < 2) return;
+    e.preventDefault();
+    const idx = tabs.indexOf(document.activeElement);
+    const current = idx === -1 ? tabs.findIndex(t => t.classList.contains('active')) : idx;
+    let next = current;
+    if (e.key === 'ArrowRight') next = (current + 1) % tabs.length;
+    if (e.key === 'ArrowLeft') next = (current - 1 + tabs.length) % tabs.length;
+    if (e.key === 'Home') next = 0;
+    if (e.key === 'End') next = tabs.length - 1;
+    tabs[next].focus();
+    tabs[next].click();
+  });
+}
+
+/* ---------- Toast (undo + status) ----------
+ * Stacked; plain toasts cap at MAX_TOASTS while action toasts (Undo/View)
+ * are exempt up to MAX_ACTION_TOASTS so rapid deletes never eat recovery.
+ * Error toasts share one slot so bursts can't pile up or clobber Undo;
+ * auto-dismiss waits out :focus-within; duration<=0 never auto-dismisses. */
+const MAX_TOASTS = 3;
+const MAX_ACTION_TOASTS = 6;
+let errorToast = null;
+function armToastDismiss(el, duration) {
+  if (duration <= 0) return null;
+  const clearIfUnfocused = () => {
+    if (el.contains(document.activeElement)) {
+      el._retry = setTimeout(clearIfUnfocused, 1000);
+      return;
+    }
+    el.remove();
+    if (errorToast === el) errorToast = null;
+  };
+  return setTimeout(clearIfUnfocused, duration);
+}
+export function showToast(message, opts = {}) {
+  let region = document.getElementById('toast-region');
+  if (!region) {
+    // Self-heal: older cached HTML may lack the region — create it so
+    // toasts never silently vanish.
+    region = document.createElement('div');
+    region.id = 'toast-region';
+    region.className = 'toast-region';
+    region.setAttribute('aria-live', 'polite');
+    region.setAttribute('aria-atomic', 'true');
+    document.body.appendChild(region);
+  }
+  const { actionLabel, onAction, kind = 'info', duration = 5000 } = opts;
+  const hasAction = !!(actionLabel && typeof onAction === 'function');
+  if (kind === 'error' && errorToast && errorToast.isConnected) {
+    errorToast.querySelector('span').textContent = message;
+    if (errorToast._timer) clearTimeout(errorToast._timer);
+    if (errorToast._retry) clearTimeout(errorToast._retry);
+    errorToast._timer = armToastDismiss(errorToast, duration);
+    return errorToast;
+  }
+  while (region.children.length >= (hasAction ? MAX_ACTION_TOASTS : MAX_TOASTS)) {
+    const plain = [...region.children].find(c => !c.querySelector('button'));
+    (plain || region.firstChild).remove();
+  }
+  const el = document.createElement('div');
+  el.className = 'toast';
+  // No role=status here: the region itself is the single live source.
+  const text = document.createElement('span');
+  text.textContent = message;
+  el.appendChild(text);
+  if (actionLabel && typeof onAction === 'function') {
+    const btn = document.createElement('button');
+    btn.className = 'btn small';
+    btn.textContent = actionLabel;
+    btn.addEventListener('click', () => {
+      onAction();
+      if (el._timer) clearTimeout(el._timer);
+      if (el._retry) clearTimeout(el._retry);
+      el.remove();
+      if (errorToast === el) errorToast = null;
+    });
+    el.appendChild(btn);
+  }
+  if (kind === 'error') {
+    el.style.borderColor = 'var(--f)';
+    errorToast = el;
+  }
+  region.appendChild(el);
+  el._timer = armToastDismiss(el, duration);
+  return el;
+}
+
+window.addEventListener('cb-toast', (e) => {
+  const detail = e && e.detail ? e.detail : {};
+  showToast(detail.message || 'Something happened.', { kind: detail.kind || 'info', duration: detail.duration ?? 5000 });
+});
+
+/* Polite one-shot announcements for silent visual toggles (no toast spam). */
+export function announce(message) {
+  let el = document.getElementById('sr-announcer');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'sr-announcer';
+    el.className = 'sr-only';
+    el.setAttribute('aria-live', 'polite');
+    document.body.appendChild(el);
+  }
+  el.textContent = '';
+  requestAnimationFrame(() => { el.textContent = message; });
 }
